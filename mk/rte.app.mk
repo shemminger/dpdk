@@ -183,6 +183,7 @@ ifeq ($(CONFIG_RTE_LIBRTE_VHOST),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_VHOST)      += -lrte_pmd_vhost
 endif # $(CONFIG_RTE_LIBRTE_VHOST)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_VMXNET3_PMD)    += -lrte_pmd_vmxnet3_uio
+_LDLIBS-$(CONFIG_RTE_LIBRTE_VMBUS)	    += -lrte_bus_vmbus -luuid
 
 ifeq ($(CONFIG_RTE_LIBRTE_BBDEV),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_BBDEV_NULL)     += -lrte_pmd_bbdev_null
