@@ -22,6 +22,7 @@ Network Interface Controller Drivers
     ena
     enic
     fm10k
+    hyperv
     i40e
     igb
     ixgbe
