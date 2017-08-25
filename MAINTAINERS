@@ -479,6 +479,13 @@ F: drivers/net/enic/
 F: doc/guides/nics/enic.rst
 F: doc/guides/nics/features/enic.ini
 
+Hyper-V netvsc
+M: Stephen Hemminger <sthemmin@microsoft.com>
+M: K. Y. Srinivasan" <kys@microsoft.com>
+M: Haiyang Zhang <haiyangz@microsoft.com>
+F: drivers/net/hyperv/
+F: doc/guides/nics/hyperv.rst
+
 Intel e1000
 M: Wenzhuo Lu <wenzhuo.lu@intel.com>
 T: git://dpdk.org/next/dpdk-next-net-intel
