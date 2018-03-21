@@ -249,6 +249,15 @@ The commandline options are:
     Set the MAC address ``XX:XX:XX:XX:XX:XX`` of the peer port N,
     where 0 <= N < ``CONFIG_RTE_MAX_ETHPORTS`` from the configuration file.
 
+
+*   ``--tx-ip=SRC,DST``
+    Set the source and destination IP address used when doing transmit only test.
+    The defaults are source 192.18.0.1 and destination 192.18.0.2.
+
+*   ``--tx-udp=SRC[,DST]``
+    Set the source and destination UDP port number for transmit test only test.
+    The default port is the 9 (discard).
+
 *   ``--pkt-filter-mode=mode``
 
     Set Flow Director mode where mode is either ``none`` (the default), ``signature`` or ``perfect``.

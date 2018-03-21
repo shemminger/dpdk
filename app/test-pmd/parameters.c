@@ -19,6 +19,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <arpa/inet.h>
 
 #include <rte_common.h>
 #include <rte_byteorder.h>
@@ -65,6 +66,7 @@ usage(char* progname)
 #ifdef RTE_LIBRTE_CMDLINE
 	       "--eth-peers-configfile= | "
 	       "--eth-peer=X,M:M:M:M:M:M | "
+	       "--tx-ip=SRC,DST | --tx-udp=PORT | "
 #endif
 	       "--pkt-filter-mode= |"
 	       "--rss-ip | --rss-udp | "
@@ -621,6 +623,8 @@ launch_args_parse(int argc, char** argv)
 		{ "print-event",		1, 0, 0 },
 		{ "mask-event",			1, 0, 0 },
 		{ "tx-offloads",		1, 0, 0 },
+		{ "tx-ip",			1, 0, 0 },
+		{ "tx-udp",			1, 0, 0 },
 		{ 0, 0, 0, 0 },
 	};
 
@@ -714,6 +718,51 @@ launch_args_parse(int argc, char** argv)
 				nb_peer_eth_addrs++;
 			}
 #endif
+			if (!strcmp(lgopts[opt_idx].name, "tx-ip")) {
+				in_addr_t in;
+				char *end;
+
+				end = strchr(optarg, ',');
+				if (end == optarg || !end)
+					rte_exit(EXIT_FAILURE,
+						 "Invalid tx-ip: %s", optarg);
+
+				*end++ = 0;
+				if (inet_pton(AF_INET, optarg, &in) != 1)
+					rte_exit(EXIT_FAILURE,
+						 "Invalid source IP address: %s\n", optarg);
+				tx_ip_src_addr = rte_be_to_cpu_32(in);
+
+				if (inet_pton(AF_INET, end, &in) != 1)
+					rte_exit(EXIT_FAILURE,
+						 "Invalid destination IP address: %s\n", optarg);
+				tx_ip_dst_addr = rte_be_to_cpu_32(in);
+			}
+			if (!strcmp(lgopts[opt_idx].name, "tx-udp")) {
+				char *end = NULL;
+
+				errno = 0;
+				n = strtoul(optarg, &end, 10);
+				if (errno != 0 || end == optarg || n > UINT16_MAX ||
+				    !(*end == '\0' || *end == ','))
+					rte_exit(EXIT_FAILURE,
+						 "Invalid UDP port: %s\n", optarg);
+				tx_udp_src_port = n;
+				if (*end == ',') {
+					char *dst = end + 1;
+
+					n = strtoul(dst, &end, 10);
+					if (errno != 0 || end == dst ||
+					    n > UINT16_MAX || *end)
+						rte_exit(EXIT_FAILURE,
+							 "Invalid destination UDP port: %s\n",
+							 dst);
+					tx_udp_dst_port = n;
+				} else {
+					tx_udp_dst_port = n;
+				}
+
+			}
 			if (!strcmp(lgopts[opt_idx].name, "nb-ports")) {
 				n = atoi(optarg);
 				if (n > 0 && n <= nb_ports)

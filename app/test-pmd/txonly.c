@@ -40,11 +40,13 @@
 
 #include "testpmd.h"
 
-#define UDP_SRC_PORT 1024
-#define UDP_DST_PORT 1024
+/* from RFC 863 Discard Protocol */
+uint16_t tx_udp_src_port = 9;
+uint16_t tx_udp_dst_port = 9;
 
-#define IP_SRC_ADDR ((192U << 24) | (168 << 16) | (0 << 8) | 1)
-#define IP_DST_ADDR ((192U << 24) | (168 << 16) | (0 << 8) | 2)
+/* from RFC 2544 reserved network test addresses */
+uint32_t tx_ip_src_addr = (192U << 24) | (18 << 16) | (0 << 8) | 1;
+uint32_t tx_ip_dst_addr = (192U << 24) | (18 << 16) | (0 << 8) | 2;
 
 #define IP_DEFTTL  64   /* from RFC 1340. */
 #define IP_VERSION 0x40
@@ -104,8 +106,8 @@ setup_pkt_udp_ip_headers(struct ipv4_hdr *ip_hdr,
 	 * Initialize UDP header.
 	 */
 	pkt_len = (uint16_t) (pkt_data_len + sizeof(struct udp_hdr));
-	udp_hdr->src_port = rte_cpu_to_be_16(UDP_SRC_PORT);
-	udp_hdr->dst_port = rte_cpu_to_be_16(UDP_DST_PORT);
+	udp_hdr->src_port = rte_cpu_to_be_16(tx_udp_src_port);
+	udp_hdr->dst_port = rte_cpu_to_be_16(tx_udp_dst_port);
 	udp_hdr->dgram_len      = RTE_CPU_TO_BE_16(pkt_len);
 	udp_hdr->dgram_cksum    = 0; /* No UDP checksum. */
 
@@ -120,8 +122,8 @@ setup_pkt_udp_ip_headers(struct ipv4_hdr *ip_hdr,
 	ip_hdr->next_proto_id = IPPROTO_UDP;
 	ip_hdr->packet_id = 0;
 	ip_hdr->total_length   = RTE_CPU_TO_BE_16(pkt_len);
-	ip_hdr->src_addr = rte_cpu_to_be_32(IP_SRC_ADDR);
-	ip_hdr->dst_addr = rte_cpu_to_be_32(IP_DST_ADDR);
+	ip_hdr->src_addr = rte_cpu_to_be_32(tx_ip_src_addr);
+	ip_hdr->dst_addr = rte_cpu_to_be_32(tx_ip_dst_addr);
 
 	/*
 	 * Compute IP header checksum.
