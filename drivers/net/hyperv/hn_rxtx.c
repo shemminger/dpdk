@@ -26,7 +26,6 @@
 #include <rte_dev.h>
 #include <rte_bus_vmbus.h>
 #include <rte_spinlock.h>
-#include <rte_hexdump.h>
 
 #include "hn_logs.h"
 #include "hn_var.h"
@@ -37,7 +36,7 @@
 #define HN_NVS_SEND_MSG_SIZE \
 	(sizeof(struct vmbus_chanpkt_hdr) + sizeof(struct hn_nvs_rndis))
 
-#define HN_TXD_CACHE_SIZE	0 /* could be 32 */
+#define HN_TXD_CACHE_SIZE	32 /* per cpu tx_descriptor pool cache */
 
 struct hn_rxinfo {
 	uint32_t	vlan_info;
@@ -77,14 +76,12 @@ struct hn_txdesc {
 	struct rte_mbuf *m;
 
 	uint16_t	queue_id;
-	uint32_t	data_size;
-
-	uint32_t	chim_index;
-	uint32_t	chim_packets;
+	uint16_t	chim_index;
 	uint32_t	chim_size;
+	uint32_t	data_size;
+	uint32_t	packets;
 
 	struct rndis_packet_msg *rndis_pkt;
-	struct rndis_packet_msg *rndis_prev;
 };
 
 #define HN_RNDIS_PKT_LEN				\
@@ -96,6 +93,10 @@ struct hn_txdesc {
 
 /* Threshold where chimney (copy) is used for small packets */
 #define HN_CHIM_THRESHOLD	(HN_RNDIS_PKT_LEN + 256)
+
+/* Minimum space required for a packet */
+#define HN_PKTSIZE_MIN(align) \
+	RTE_ALIGN(ETHER_MIN_LEN + HN_RNDIS_PKT_LEN, align)
 
 #define DEFAULT_TX_FREE_THRESH 32U
 
@@ -161,6 +162,14 @@ hn_tx_pool_init(struct rte_eth_dev *dev)
 	return 0;
 }
 
+static void hn_reset_txagg(struct hn_tx_queue *txq)
+{
+	txq->agg_szleft = txq->agg_szmax;
+	txq->agg_pktleft = txq->agg_pktmax;
+	txq->agg_txd = NULL;
+	txq->agg_prevpkt = NULL;
+}
+
 int
 hn_dev_tx_queue_setup(struct rte_eth_dev *dev,
 		      uint16_t queue_idx, uint16_t nb_desc __rte_unused,
@@ -199,6 +208,17 @@ hn_dev_tx_queue_setup(struct rte_eth_dev *dev,
 	}
 
 	txq->free_thresh = tx_free_thresh;
+
+	txq->agg_szmax  = RTE_MIN(hv->chim_szmax, hv->rndis_agg_size);
+	txq->agg_pktmax = hv->rndis_agg_pkts;
+	txq->agg_align  = hv->rndis_agg_align;
+
+	hn_reset_txagg(txq);
+
+	PMD_DRV_LOG(INFO,
+		    "tx queue aggregation packets=%u bytes=%u align=%u"
+		    txq->agg_pktmax, txq->agg_szmax, txq->agg_align);
+
 	dev->data->tx_queues[queue_idx] = txq;
 
 	return 0;
@@ -242,14 +262,8 @@ hn_nvs_send_completed(struct rte_eth_dev *dev,
 		   txd->chim_index, txd->m, txd->data_size);
 
 	txq->stats.bytes += txd->data_size;
-	if (txd->m) {
-		/* Indirect send */
-		++txq->stats.packets;
-		rte_pktmbuf_free(txd->m);
-	} else {
-		/* Buffered send */
-		txq->stats.packets += txd->chim_packets;
-	}
+	txq->stats.packets += txd->packets;
+	rte_pktmbuf_free(txd->m);
 
 	rte_mempool_put(txq->hv->tx_pool, txd);
 }
@@ -815,26 +829,23 @@ static inline void *hn_chim_addr(const struct hn_data *hv,
 		+ txd->chim_index * hv->chim_szmax + offset;
 }
 
-static void hn_append_to_chim(const struct hn_data *hv,
-			      struct hn_txdesc *txd,
+static void hn_append_to_chim(struct hn_tx_queue *txq,
+			      struct rndis_packet_msg *pkt,
 			      const struct rte_mbuf *m)
 {
-	void *buf = hn_chim_addr(hv, txd, txd->chim_size);
+	struct hn_txdesc *txd = txq->agg_txd;
+	uint8_t *buf = (uint8_t *)pkt;
 	unsigned int data_offs;
-	static int count;
 
-	/* skip RNDIS header already in place */
-	data_offs = RNDIS_PACKET_MSG_OFFSET_ABS(hn_rndis_pktlen(buf));
-
-	if (count < 10) {
-		rte_hexdump(stdout, "rndis", buf, data_offs);
-		++count;
-	}
+	data_offs = RNDIS_PACKET_MSG_OFFSET_ABS(pkt->dataoffset);
+	txd->chim_size += pkt->len;
+	txd->data_size += m->pkt_len;
+	++txd->packets;
 
 	for (; m; m = m->next) {
 		uint16_t len = rte_pktmbuf_data_len(m);
 
-		rte_memcpy((char *)buf + data_offs,
+		rte_memcpy(buf + data_offs,
 			   rte_pktmbuf_mtod(m, const char *), len);
 		data_offs += len;
 	}
@@ -845,27 +856,34 @@ static void hn_append_to_chim(const struct hn_data *hv,
  * Returns error if send was unsuccessful because channel ring buffer
  * was full.
  */
-static int hn_flush_txagg(struct hn_txdesc *txd,
-			  struct hn_tx_queue *txq, bool *need_sig)
+static int hn_flush_txagg(struct hn_tx_queue *txq, bool *need_sig)
+
 {
-	struct hn_nvs_rndis rndis = {
-		.type = NVS_TYPE_RNDIS,
-		.rndis_mtype = NVS_RNDIS_MTYPE_DATA,
-		.chim_idx = txd->chim_index,
-		.chim_sz = txd->chim_size,
-	};
+	struct hn_txdesc *txd = txq->agg_txd;
+	struct hn_nvs_rndis rndis;
 	int ret;
+
+	if (!txd)
+		return 0;
 
 	PMD_TX_LOG(DEBUG,
 		   "port %u:%u send chim index %u size %u packets %u size %u",
 		   txq->port_id, txq->queue_id,
 		   txd->chim_index, txd->chim_size,
-		   txd->chim_packets, txd->data_size);
+		   txd->packets, txd->data_size);
+
+	rndis = (struct hn_nvs_rndis) {
+		.type = NVS_TYPE_RNDIS,
+		.rndis_mtype = NVS_RNDIS_MTYPE_DATA,
+		.chim_idx = txd->chim_index,
+		.chim_sz = txd->chim_size,
+	};
 
 	ret = hn_nvs_send(txq->chan, VMBUS_CHANPKT_FLAG_RC,
 			  &rndis, sizeof(rndis), (uintptr_t)txd, need_sig);
+
 	if (likely(ret == 0))
-		txq->agg_txd = NULL;
+		hn_reset_txagg(txq);
 
 	return ret;
 }
@@ -880,56 +898,67 @@ static struct hn_txdesc *hn_new_txd(struct hn_data *hv,
 
 	txd->m = NULL;
 	txd->queue_id = txq->queue_id;
-	txd->chim_packets = 0;
+	txd->packets = 0;
 	txd->data_size = 0;
 	txd->chim_size = 0;
-	txd->rndis_prev = NULL;
 
 	return txd;
 }
 
-static inline struct hn_txdesc *
-hn_try_txagg(struct hn_data *hv, struct hn_tx_queue *txq)
+static void *
+hn_try_txagg(struct hn_data *hv, struct hn_tx_queue *txq, uint32_t pktsize)
 {
-	struct hn_txdesc *txd = txq->agg_txd;
+	struct hn_txdesc *agg_txd = txq->agg_txd;
+	struct rndis_packet_msg *pkt;
+	void *chim;
 
-	/*
-	 * If this packet would overfill the current aggregation slot
-	 * then flush and get new one.
-	 */
-	if (txd) {
-		struct rndis_packet_msg *pkt = txd->rndis_prev;
+	if (agg_txd) {
+		unsigned int padding, olen;
 
-		if (pkt) {
-			unsigned int olen = pkt->len;
+		/*
+		 * Update the previous RNDIS packet's total length,
+		 * it can be increased due to the mandatory alignment
+		 * padding for this RNDIS packet.  And update the
+		 * aggregating txdesc's chimney sending buffer size
+		 * accordingly.
+		 *
+		 * Zero-out the padding, as required by the RNDIS spec.
+		 */
+		pkt = txq->agg_prevpkt;
+		olen = pkt->len;
+		padding = RTE_ALIGN(olen, txq->agg_align) - olen;
+		if (padding > 0) {
+			agg_txd->chim_size += padding;
+			pkt->len += padding;
+			memset((uint8_t *)pkt + olen, 0, padding);
+		}
 
-			/* Update the previous RNDIS packet total length */
-			pkt->len = RTE_ALIGN(olen, hv->rndis_agg_align);
-			txd->chim_size += pkt->len - olen;
+		chim = (uint8_t *) pkt + pkt->len;
+
+		txq->agg_pktleft--;
+		txq->agg_szleft -= pktsize;
+		if (txq->agg_szleft < HN_PKTSIZE_MIN(txq->agg_align)) {
+			/*
+			 * Probably can't aggregate more packets,
+			 * flush this aggregating txdesc proactively.
+			 */
+			txq->agg_pktleft = 0;
 		}
 	} else {
-		txd = hn_new_txd(hv, txq);
-		txq->agg_txd = txd;
+		agg_txd = hn_new_txd(hv, txq);
+		if (!agg_txd)
+			return NULL;
+
+		chim = (uint8_t *)hv->chim_res->addr
+			+ agg_txd->chim_index * hv->chim_szmax;
+
+		txq->agg_txd = agg_txd;
+		txq->agg_pktleft = txq->agg_pktmax - 1;
+		txq->agg_szleft = txq->agg_szmax - pktsize;
 	}
-	return txd;
-}
+	txq->agg_prevpkt = chim;
 
-static inline bool
-hn_txagg_space(const struct hn_data *hv, const struct hn_txdesc *txd,
-	       uint32_t pkt_size)
-{
-	/* No active aggregation buffer */
-	if (!txd)
-		return true;
-
-	if (txd->chim_packets == hv->chim_cnt)
-		return false;
-
-	if (pkt_size + hv->rndis_agg_align + txd->chim_size
-	    > hv->chim_szmax)
-		return false;
-
-	return true;
+	return chim;
 }
 
 static inline void *
@@ -1083,40 +1112,33 @@ hn_xmit_pkts(void *ptxq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 	for (nb_tx = 0; nb_tx < nb_pkts; nb_tx++) {
 		struct rte_mbuf *m = tx_pkts[nb_tx];
 		uint32_t pkt_size = m->pkt_len + HN_RNDIS_PKT_LEN;
-		struct hn_txdesc *txd = txq->agg_txd;
 		struct rndis_packet_msg *pkt;
 
 		/* For small packets aggregate them in chimney buffer */
 		if (m->pkt_len + HN_RNDIS_PKT_LEN < HN_CHIM_THRESHOLD) {
 			/* If this packet will not fit, then flush  */
-			if (!hn_txagg_space(hv, txd, pkt_size) &&
-			    hn_flush_txagg(txd, txq, &need_sig))
-				goto fail;
+			if (RTE_ALIGN(pkt_size, txq->agg_align) < txq->agg_szleft)
+				if (hn_flush_txagg(txq, &need_sig))
+					goto fail;
 
-			txd = hn_try_txagg(hv, txq);
-			if (unlikely(txd == NULL))
+			pkt = hn_try_txagg(hv, txq, pkt_size);
+			if (unlikely(pkt == NULL))
 				goto fail;
-
-			pkt = hn_chim_addr(hv, txd, txd->chim_size);
-			txd->rndis_prev = pkt;
 
 			hn_encap(pkt, txq->queue_id, m);
-			hn_append_to_chim(hv, txd, m);
-
-			txd->chim_size += pkt->len;
-			txd->data_size += m->pkt_len;
-			++txd->chim_packets;
+			hn_append_to_chim(txq, pkt, m);
 
 			rte_pktmbuf_free(m);
 
 			/* if buffer is full, flush */
-			if (txd->chim_packets == hv->chim_cnt &&
-			    hn_flush_txagg(txd, txq, &need_sig))
+			if (txq->agg_pktleft == 0 &&
+			    hn_flush_txagg(txq, &need_sig))
 				goto fail;
 		} else {
+			struct hn_txdesc *txd;
+
 			/* flush pending buffer first */
-			if (txd &&
-			    hn_flush_txagg(txd, txq, &need_sig))
+			if (hn_flush_txagg(txq, &need_sig))
 				goto fail;
 
 			/* Send larger packets directly */
@@ -1127,6 +1149,7 @@ hn_xmit_pkts(void *ptxq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 			pkt = txd->rndis_pkt;
 			txd->m = m;
 			txd->data_size = m->pkt_len;
+			txd->packets = 1;
 
 			hn_encap(pkt, txq->queue_id, m);
 
@@ -1142,8 +1165,7 @@ hn_xmit_pkts(void *ptxq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 	/* If partial buffer left, then try and send it.
 	 * if that fails, then reuse it on next send.
 	 */
-	if (txq->agg_txd)
-		hn_flush_txagg(txq->agg_txd, txq, &need_sig);
+	hn_flush_txagg(txq, &need_sig);
 
 fail:
 	if (need_sig)

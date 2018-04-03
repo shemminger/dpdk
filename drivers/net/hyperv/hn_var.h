@@ -53,10 +53,20 @@ struct hn_stats {
 struct hn_tx_queue {
 	struct hn_data  *hv;
 	struct vmbus_channel *chan;
+	uint16_t	port_id;
+	uint16_t	queue_id;
+	uint32_t	free_thresh;
+
+	/* Applied packet transmission aggregation limits. */
+	uint32_t	agg_szmax;
+	uint32_t	agg_pktmax;
+	uint32_t	agg_align;
+
+	/* Packet transmission aggregation states */
 	struct hn_txdesc *agg_txd;
-	uint16_t port_id;
-	uint16_t queue_id;
-	uint32_t free_thresh;
+	uint32_t	agg_pktleft;
+	uint32_t	agg_szleft;
+	struct rndis_packet_msg *agg_prevpkt;
 
 	struct hn_stats stats;
 };
@@ -82,16 +92,16 @@ struct hn_data {
 	uint32_t	link_status;
 	uint32_t	link_speed;
 
-	struct rte_mem_resource *rxbuf_res;
-	uint32_t	rxbuf_section_cnt;
-	uint16_t	max_queues;
+	struct rte_mem_resource *rxbuf_res;	/* UIO resource for Rx */
+	uint32_t	rxbuf_section_cnt;	/* # of Rx sections */
+	uint16_t	max_queues;		/* Max available queues */
 	uint16_t	num_queues;
 	uint64_t	rss_offloads;
 
-	struct rte_mem_resource *chim_res;
-	struct rte_mempool *tx_pool;
-	uint32_t	chim_szmax;
-	uint32_t	chim_cnt;
+	struct rte_mem_resource *chim_res;	/* UIO resource for Tx */
+	struct rte_mempool *tx_pool;		/* Tx descriptors */
+	uint32_t	chim_szmax;		/* Max size per buffer */
+	uint32_t	chim_cnt;		/* Max packets per buffer */
 
 	uint32_t	nvs_ver;
 	uint32_t	ndis_ver;

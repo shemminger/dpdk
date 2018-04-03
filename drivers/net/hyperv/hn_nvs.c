@@ -291,8 +291,8 @@ hn_nvs_conn_chim(struct hn_data *hv)
 	hv->chim_szmax = sectsz;
 	hv->chim_cnt = len / sectsz;
 
-	PMD_DRV_LOG(INFO, "send buffer section size: %d, count:%d",
-		    hv->chim_szmax, hv->chim_cnt);
+	PMD_DRV_LOG(INFO, "send buffer %lu section size:%u, count:%u",
+		    len, hv->chim_szmax, hv->chim_cnt);
 
 	if (len % hv->chim_szmax != 0) {
 		PMD_DRV_LOG(NOTICE,
