@@ -852,16 +852,6 @@ void hn_process_events(struct hn_data *hv, uint16_t queue_id)
 	}
 }
 
-
-/* Return start of section of send buffer */
-static inline void *hn_chim_addr(const struct hn_data *hv,
-				 const struct hn_txdesc *txd,
-				 uint32_t offset)
-{
-	return (uint8_t *)hv->chim_res->addr
-		+ txd->chim_index * hv->chim_szmax + offset;
-}
-
 static void hn_append_to_chim(struct hn_tx_queue *txq,
 			      struct rndis_packet_msg *pkt,
 			      const struct rte_mbuf *m)
@@ -918,6 +908,9 @@ static int hn_flush_txagg(struct hn_tx_queue *txq, bool *need_sig)
 
 	if (likely(ret == 0))
 		hn_reset_txagg(txq);
+	else
+		PMD_TX_LOG(NOTICE, "port %u:%u send failed: %d",
+			   txq->port_id, txq->queue_id, ret);
 
 	return ret;
 }
@@ -928,10 +921,8 @@ static struct hn_txdesc *hn_new_txd(struct hn_data *hv,
 	struct hn_txdesc *txd;
 
 	if (rte_mempool_get(hv->tx_pool, (void **)&txd)) {
-		/* try and reclaim some transmit descriptors */
-		hn_process_events(hv, txq->queue_id);
-		if (rte_mempool_get(hv->tx_pool, (void **)&txd))
-			return NULL;
+		PMD_TX_LOG(DEBUG, "tx pool exhausted!");
+		return NULL;
 	}
 
 	txd->m = NULL;
@@ -1146,7 +1137,7 @@ hn_xmit_pkts(void *ptxq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 	if (unlikely(hv->closed))
 		return 0;
 
-	if (rte_mempool_avail_count(hv->tx_pool) <= txq->free_thresh)
+	if (rte_mempool_avail_count(hv->tx_pool) <= RTE_MAX(txq->free_thresh, nb_pkts))
 		hn_process_events(hv, txq->queue_id);
 
 	for (nb_tx = 0; nb_tx < nb_pkts; nb_tx++) {
@@ -1157,7 +1148,8 @@ hn_xmit_pkts(void *ptxq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 		/* For small packets aggregate them in chimney buffer */
 		if (m->pkt_len + HN_RNDIS_PKT_LEN < HN_CHIM_THRESHOLD) {
 			/* If this packet will not fit, then flush  */
-			if (RTE_ALIGN(pkt_size, txq->agg_align) < txq->agg_szleft)
+			if (txq->agg_pktleft == 0 ||
+			    RTE_ALIGN(pkt_size, txq->agg_align) < txq->agg_szleft)
 				if (hn_flush_txagg(txq, &need_sig))
 					goto fail;
 
@@ -1195,7 +1187,7 @@ hn_xmit_pkts(void *ptxq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 
 			ret = hn_xmit_sg(txq, txd, m, &need_sig);
 			if (unlikely(ret != 0)) {
-				PMD_TX_LOG(ERR, "sg send failed: %d", ret);
+				PMD_TX_LOG(NOTICE, "sg send failed: %d", ret);
 				rte_mempool_put(hv->tx_pool, txd);
 				goto fail;
 			}
