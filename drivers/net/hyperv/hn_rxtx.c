@@ -893,8 +893,12 @@ static struct hn_txdesc *hn_new_txd(struct hn_data *hv,
 {
 	struct hn_txdesc *txd;
 
-	if (unlikely(rte_mempool_get(hv->tx_pool, (void **)&txd)))
-		return NULL;
+	if (rte_mempool_get(hv->tx_pool, (void **)&txd)) {
+		/* try and reclaim some transmit descriptors */
+		hn_process_events(hv, txq->queue_id);
+		if (rte_mempool_get(hv->tx_pool, (void **)&txd))
+			return NULL;
+	}
 
 	txd->m = NULL;
 	txd->queue_id = txq->queue_id;
