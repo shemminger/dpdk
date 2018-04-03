@@ -106,7 +106,6 @@ vmbus_probe_one_driver(struct rte_vmbus_driver *dr,
 
 	/* TODO add blacklisted */
 
-
 	/* map resources for device */
 	ret = rte_vmbus_map_device(dev);
 	if (ret != 0)
