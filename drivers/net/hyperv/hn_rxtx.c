@@ -216,7 +216,7 @@ hn_dev_tx_queue_setup(struct rte_eth_dev *dev,
 	hn_reset_txagg(txq);
 
 	PMD_DRV_LOG(INFO,
-		    "tx queue aggregation packets=%u bytes=%u align=%u"
+		    "tx queue aggregation packets=%u bytes=%u align=%u",
 		    txq->agg_pktmax, txq->agg_szmax, txq->agg_align);
 
 	dev->data->tx_queues[queue_idx] = txq;
