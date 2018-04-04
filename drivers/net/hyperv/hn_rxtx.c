@@ -100,6 +100,38 @@ struct hn_txdesc {
 
 #define DEFAULT_TX_FREE_THRESH 32U
 
+static void
+hn_update_packet_stats(struct hn_stats *stats, const struct rte_mbuf *m)
+{
+	uint32_t s = m->pkt_len;
+	const struct ether_addr *ea;
+
+	if (s == 64) {
+		stats->size_bins[1]++;
+	} else if (s > 64 && s < 1024) {
+		uint32_t bin;
+
+		/* count zeros, and offset into correct bin */
+		bin = (sizeof(s) * 8) - __builtin_clz(s) - 5;
+		stats->size_bins[bin]++;
+	} else {
+		if (s < 64)
+			stats->size_bins[0]++;
+		else if (s < 1519)
+			stats->size_bins[6]++;
+		else if (s >= 1519)
+			stats->size_bins[7]++;
+	}
+
+	ea = rte_pktmbuf_mtod(m, const struct ether_addr *);
+	if (is_multicast_ether_addr(ea)) {
+		if (is_broadcast_ether_addr(ea))
+			stats->broadcast++;
+		else
+			stats->multicast++;
+	}
+}
+
 static inline unsigned int hn_rndis_pktlen(const struct rndis_packet_msg *pkt)
 {
 	return pkt->pktinfooffset + pkt->pktinfolen;
@@ -441,10 +473,11 @@ static void hn_rxpkt(struct hn_rx_queue *rxq, const void *data,
 		   rxq->port_id, rxq->queue_id,
 		   m->pkt_len, m->ol_flags);
 
-	if (likely(rte_ring_sp_enqueue(rxq->rx_ring, m) == 0)) {
-		++rxq->stats.packets;
-		rxq->stats.bytes += m->pkt_len;
-	} else {
+	++rxq->stats.packets;
+	rxq->stats.bytes += m->pkt_len;
+	hn_update_packet_stats(&rxq->stats, m);
+
+	if (unlikely(rte_ring_sp_enqueue(rxq->rx_ring, m) != 0)) {
 		++rxq->ring_full;
 		rte_pktmbuf_free(m);
 	}
@@ -841,6 +874,7 @@ static void hn_append_to_chim(struct hn_tx_queue *txq,
 	txd->chim_size += pkt->len;
 	txd->data_size += m->pkt_len;
 	++txd->packets;
+	hn_update_packet_stats(&txq->stats, m);
 
 	for (; m; m = m->next) {
 		uint16_t len = rte_pktmbuf_data_len(m);
@@ -1093,6 +1127,8 @@ static inline int hn_xmit_sg(struct hn_tx_queue *txq,
 		sg[i].ofs = addr & PAGE_MASK;
 		sg[i].len = rte_pktmbuf_data_len(m);
 	}
+
+	hn_update_packet_stats(&txq->stats, m);
 
 	return hn_nvs_send_rndis_sglist(txq->chan, NVS_RNDIS_MTYPE_DATA,
 					(uintptr_t)txd, sg, segs, need_sig);

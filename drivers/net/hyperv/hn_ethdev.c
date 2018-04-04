@@ -47,6 +47,27 @@
 int hn_logtype_init;
 int hn_logtype_driver;
 
+struct hn_xstats_name_off {
+	char name[RTE_ETH_XSTATS_NAME_SIZE];
+	unsigned offset;
+};
+
+static const struct hn_xstats_name_off hn_stat_strings[] = {
+	{"good_packets",           offsetof(struct hn_stats, packets)},
+	{"good_bytes",             offsetof(struct hn_stats, bytes)},
+	{"errors",                 offsetof(struct hn_stats, errors)},
+	{"multicast_packets",      offsetof(struct hn_stats, multicast)},
+	{"broadcast_packets",      offsetof(struct hn_stats, broadcast)},
+	{"undersize_packets",      offsetof(struct hn_stats, size_bins[0])},
+	{"size_64_packets",        offsetof(struct hn_stats, size_bins[1])},
+	{"size_65_127_packets",    offsetof(struct hn_stats, size_bins[2])},
+	{"size_128_255_packets",   offsetof(struct hn_stats, size_bins[3])},
+	{"size_256_511_packets",   offsetof(struct hn_stats, size_bins[4])},
+	{"size_512_1023_packets",  offsetof(struct hn_stats, size_bins[5])},
+	{"size_1024_1518_packets", offsetof(struct hn_stats, size_bins[6])},
+	{"size_1519_max_packets",  offsetof(struct hn_stats, size_bins[7])},
+};
+
 static struct rte_eth_dev *
 eth_dev_vmbus_allocate(struct rte_vmbus_device *dev, size_t private_data_size)
 {
@@ -383,6 +404,87 @@ hn_dev_stats_reset(struct rte_eth_dev *dev)
 	}
 }
 
+static int
+hn_dev_xstats_get_names(struct rte_eth_dev *dev,
+			struct rte_eth_xstat_name *xstats_names,
+			__rte_unused unsigned limit)
+{
+	unsigned int i, t, count = 0;
+
+	if (xstats_names == NULL)
+		return dev->data->nb_tx_queues * ARRAY_SIZE(hn_stat_strings)
+			+ dev->data->nb_rx_queues * ARRAY_SIZE(hn_stat_strings);
+
+	/* Note: limit checked in rte_eth_xstats_names() */
+	for (i = 0; i < dev->data->nb_tx_queues; i++) {
+		const struct hn_tx_queue *txq = dev->data->tx_queues[i];
+
+		if (txq == NULL)
+			continue;
+
+		for (t = 0; t < ARRAY_SIZE(hn_stat_strings); t++)
+			snprintf(xstats_names[count++].name,
+				 RTE_ETH_XSTATS_NAME_SIZE,
+				 "tx_q%u_%s", i, hn_stat_strings[t].name);
+	}
+
+	for (i = 0; i < dev->data->nb_rx_queues; i++)  {
+		const struct hn_rx_queue *rxq = dev->data->rx_queues[i];
+
+		if (rxq == NULL)
+			continue;
+
+		for (t = 0; t < ARRAY_SIZE(hn_stat_strings); t++)
+			snprintf(xstats_names[count++].name,
+				 RTE_ETH_XSTATS_NAME_SIZE,
+				 "rx_q%u_%s", i,
+				 hn_stat_strings[t].name);
+	}
+
+	return count;
+}
+
+static int
+hn_dev_xstats_get(struct rte_eth_dev *dev,
+		  struct rte_eth_xstat *xstats, unsigned n)
+{
+	unsigned i, t, count = 0;
+	const unsigned int nstats
+		= dev->data->nb_tx_queues * ARRAY_SIZE(hn_stat_strings)
+		+ dev->data->nb_rx_queues * ARRAY_SIZE(hn_stat_strings);
+	const char *stats;
+
+	if (n < nstats)
+		return nstats;
+
+	for (i = 0; i < dev->data->nb_tx_queues; i++) {
+		const struct hn_tx_queue *txq = dev->data->tx_queues[i];
+
+		if (txq == NULL)
+			continue;
+
+		stats = (const char *)&txq->stats;
+		for (t = 0; t < ARRAY_SIZE(hn_stat_strings); t++)
+			xstats[count++].value = *(const uint64_t *)
+				(stats + hn_stat_strings[t].offset);
+	}
+
+	for (i = 0; i < dev->data->nb_rx_queues; i++) {
+		const struct hn_rx_queue *rxq = dev->data->rx_queues[i];
+
+		if (rxq == NULL)
+			continue;
+
+		stats = (const char *)&rxq->stats;
+		for (t = 0; t < ARRAY_SIZE(hn_stat_strings); t++)
+			xstats[count++].value = *(const uint64_t *)
+				(stats + hn_stat_strings[t].offset);
+	}
+
+	return count;
+}
+
+
 /* enables testpmd to collect per queue stats. */
 static int
 hn_queue_stats_mapping_set(__rte_unused struct rte_eth_dev *eth_dev,
@@ -444,7 +546,10 @@ static const struct eth_dev_ops hn_eth_dev_ops = {
 	.rx_queue_release	= hn_dev_rx_queue_release,
 	.link_update		= hn_dev_link_update,
 	.stats_get		= hn_dev_stats_get,
+	.xstats_get		= hn_dev_xstats_get,
+	.xstats_get_names	= hn_dev_xstats_get_names,
 	.stats_reset            = hn_dev_stats_reset,
+	.xstats_reset		= hn_dev_stats_reset,
 	.queue_stats_mapping_set = hn_queue_stats_mapping_set,
 };
 

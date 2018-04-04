@@ -4,7 +4,7 @@ include $(RTE_SDK)/mk/rte.vars.mk
 
 LIB = librte_pmd_hyperv.a
 
-CFLAGS += -O3 $(WERROR_FLAGS)
+CFLAGS += -O3 $(WERROR_FLAGS) -g
 CFLAGS += -DALLOW_EXPERIMENTAL_API
 
 EXPORT_MAP := rte_pmd_hyperv_version.map
