@@ -5,7 +5,7 @@ sources = files('vmbus_common.c',
 		'vmbus_channel.c',
 		'vmbus_bufring.c',
 		'vmbus_common_uio.c')
-	
+
 if host_machine.system() == 'linux'
 	sources += files('linux/vmbus_bus.c',
 			'linux/vmbus_uio.c')
