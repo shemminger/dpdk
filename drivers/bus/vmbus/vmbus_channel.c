@@ -183,6 +183,9 @@ static int vmbus_read_and_signal(struct vmbus_channel *chan,
 	uint32_t write_sz, pending_sz, bytes_read;
 	int error;
 
+	/* Record where host was when we started read (for debug) */
+	rbr->windex = rbr->vbr->windex;
+
 	/* Read data and skip packet header */
 	error = vmbus_rxbr_read(rbr, data, dlen, skip);
 	if (error)
@@ -200,7 +203,7 @@ static int vmbus_read_and_signal(struct vmbus_channel *chan,
 		return 0;
 
 	rte_smp_rmb();
-	write_sz = vmbus_br_availwrite(rbr);
+	write_sz = vmbus_br_availwrite(rbr, rbr->vbr->windex);
 	bytes_read = dlen + skip + sizeof(uint64_t);
 
 	/* If there was space before then host was not blocked */

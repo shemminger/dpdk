@@ -99,10 +99,9 @@ void vmbus_br_setup(struct vmbus_br *br, void *buf, unsigned int blen);
 
 /* Amount of space available for write */
 static inline uint32_t
-vmbus_br_availwrite(const struct vmbus_br *br)
+vmbus_br_availwrite(const struct vmbus_br *br, uint32_t windex)
 {
 	uint32_t rindex = br->vbr->rindex;
-	uint32_t windex = br->vbr->windex;
 
 	if (windex >= rindex)
 		return br->dsize - (windex - rindex);
@@ -113,7 +112,7 @@ vmbus_br_availwrite(const struct vmbus_br *br)
 static inline uint32_t
 vmbus_br_availread(const struct vmbus_br *br)
 {
-	return br->dsize - vmbus_br_availwrite(br);
+	return br->dsize - vmbus_br_availwrite(br, br->vbr->windex);
 }
 
 int vmbus_txbr_write(struct vmbus_br *tbr, const struct iovec iov[], int iovlen,

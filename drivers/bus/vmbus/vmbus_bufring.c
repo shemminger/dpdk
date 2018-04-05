@@ -57,7 +57,11 @@ void vmbus_br_setup(struct vmbus_br *br, void *buf, unsigned int blen)
 static inline bool
 vmbus_txbr_need_signal(const struct vmbus_br *tbr, uint32_t old_windex)
 {
-	rte_compiler_barrier();
+	rte_smp_mb();
+	if (tbr->vbr->imask)
+		return false;
+
+	rte_smp_rmb();
 
 	/*
 	 * This is the only case we need to signal when the
@@ -117,25 +121,21 @@ vmbus_txbr_write(struct vmbus_br *tbr, const struct iovec iov[], int iovlen,
 
 	/* Reserve space in ring */
 	do {
-		uint32_t read_index = vbr->rindex;
 		uint32_t avail;
 
-		/* Save br_windex for later use */
+		/* Get current free location */
 		old_windex = tbr->windex;
 
-		/* Compute available space using fetched values */
-		if (old_windex >= read_index)
-			avail = ring_size - (old_windex - read_index);
-		else
-			avail = read_index - old_windex;
+		/* Prevent compiler reordering this with calculation */
+		rte_compiler_barrier();
+
+		avail = vmbus_br_availwrite(tbr, old_windex);
 
 		/* If not enough space in ring, then tell caller. */
 		if (avail <= total)
 			return -EAGAIN;
 
-		next_windex = old_windex + total;
-		if (next_windex > ring_size)
-			next_windex -= ring_size;
+		next_windex = vmbus_br_idxinc(old_windex, total, ring_size);
 
 		/* Atomic update of next write_index for other threads */
 	} while (!rte_atomic32_cmpset(&tbr->windex, old_windex, next_windex));
@@ -151,6 +151,9 @@ vmbus_txbr_write(struct vmbus_br *tbr, const struct iovec iov[], int iovlen,
 	save_windex = ((uint64_t)old_windex) << 32;
 	windex = vmbus_txbr_copyto(tbr, windex, &save_windex,
 				   sizeof(save_windex));
+
+	/* The region reserved should match region used */
+	RTE_ASSERT(windex == next_windex);
 
 	/* Ensure that data is available before updating host index */
 	rte_smp_wmb();
