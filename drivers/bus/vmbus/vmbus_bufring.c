@@ -28,7 +28,7 @@
 static inline uint32_t vmbus_br_idxinc(uint32_t idx, uint32_t inc, uint32_t sz)
 {
 	idx += inc;
-	if (idx > sz)
+	if (idx >= sz)
 		idx -= sz;
 
 	return idx;
@@ -78,6 +78,7 @@ vmbus_txbr_copyto(const struct vmbus_br *tbr, uint32_t windex,
 	uint32_t br_dsize = tbr->dsize;
 	const uint8_t *src = src0;
 
+	/* XXX use double mapping like Linux kernel? */
 	if (cplen > br_dsize - windex) {
 		uint32_t fraglen = br_dsize - windex;
 
