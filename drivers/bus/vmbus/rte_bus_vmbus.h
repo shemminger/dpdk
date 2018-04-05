@@ -227,16 +227,6 @@ int __rte_experimental rte_vmbus_irq_read(struct rte_vmbus_device *device);
 bool __rte_experimental rte_vmbus_chan_rx_empty(const struct vmbus_channel *channel);
 
 /**
- * Number of bytes of free space to send
- *
- * @param channel
- *	Pointer to vmbus_channel structure.
- * @return
- *	Return number of bytes available for send requests.
- */
-uint32_t __rte_experimental rte_vmbus_chan_tx_avail(const struct vmbus_channel *channel);
-
-/**
  * Send the specified buffer on the given channel
  *
  * @param channel

@@ -176,11 +176,6 @@ bool rte_vmbus_chan_rx_empty(const struct vmbus_channel *channel)
 	return br->vbr->rindex == br->vbr->windex;
 }
 
-uint32_t rte_vmbus_chan_tx_avail(const struct vmbus_channel *channel)
-{
-	return vmbus_br_availwrite(&channel->txbr);
-}
-
 static int vmbus_read_and_signal(struct vmbus_channel *chan,
 				 void *data, size_t dlen, size_t skip)
 {
