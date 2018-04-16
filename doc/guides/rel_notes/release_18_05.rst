@@ -115,6 +115,12 @@ New Features
 
   Linux uevent is supported as backend of this device event notification framework.
 
+* **Added experimental support for Hyper-V netvsc PMD.**
+
+  The new experimntal ``netvsc`` poll mode driver provides native support for
+  networking on Hyper-V. See the :doc:`../nics/netvsc` nic driver guide
+  for more details on this   new driver.
+
 
 API Changes
 -----------
