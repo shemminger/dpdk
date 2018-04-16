@@ -164,6 +164,11 @@ New Features
   stats/xstats on shared memory from secondary process, and also pdump packets on
   those virtual devices.
 
+* **Added experimental support for Hyper-V netvsc PMD.**
+
+  The new experimntal ``netvsc`` poll mode driver provides native support for
+  networking on Hyper-V. See the :doc:`../nics/netvsc` nic driver guide
+  for more details on this   new driver.
 
 API Changes
 -----------
