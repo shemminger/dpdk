@@ -45,6 +45,13 @@ if host_machine.system() == 'linux' and cc.find_library('bsd', required: false).
 	dpdk_extra_ldflags += '-lbsd'
 endif
 
+# vmbus depends on lib uuid
+uuid_dep = cc.find_library('uuid', required: false)
+if uuid_dep.found() and cc.has_header('uuid/uuid.h')
+	add_project_link_arguments('-luuid', language: 'c')
+	dpdk_extra_ldflags += '-luuid'
+endif
+
 # add -include rte_config to cflags
 add_project_arguments('-include', 'rte_config.h', language: 'c')
 
