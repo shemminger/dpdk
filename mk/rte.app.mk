@@ -192,6 +192,7 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_IFCVF_VDPA_PMD) += -lrte_ifcvf_vdpa
 endif # $(CONFIG_RTE_EAL_VFIO)
 endif # $(CONFIG_RTE_LIBRTE_VHOST)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_VMXNET3_PMD)    += -lrte_pmd_vmxnet3_uio
+_LDLIBS-$(CONFIG_RTE_LIBRTE_VMBUS)	    += -lrte_bus_vmbus -luuid
 
 ifeq ($(CONFIG_RTE_LIBRTE_BBDEV),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_BBDEV_NULL)     += -lrte_pmd_bbdev_null
