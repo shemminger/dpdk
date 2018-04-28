@@ -9,5 +9,6 @@ DIRS-$(CONFIG_RTE_LIBRTE_FSLMC_BUS) += fslmc
 endif
 DIRS-$(CONFIG_RTE_LIBRTE_PCI_BUS) += pci
 DIRS-$(CONFIG_RTE_LIBRTE_VDEV_BUS) += vdev
+DIRS-$(CONFIG_RTE_LIBRTE_VMBUS) += vmbus
 
 include $(RTE_SDK)/mk/rte.subdir.mk
