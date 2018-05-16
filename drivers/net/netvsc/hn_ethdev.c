@@ -68,6 +68,8 @@ static const struct hn_xstats_name_off hn_stat_strings[] = {
 	{ "size_1519_max_packets",  offsetof(struct hn_stats, size_bins[7]) },
 };
 
+static  pthread_once_t hn_vf_control = PTHREAD_ONCE_INIT;
+
 static struct rte_eth_dev *
 eth_dev_vmbus_allocate(struct rte_vmbus_device *dev, size_t private_data_size)
 {
@@ -96,6 +98,8 @@ eth_dev_vmbus_allocate(struct rte_vmbus_device *dev, size_t private_data_size)
 				return NULL;
 			}
 		}
+
+		pthread_once(&hn_vf_control, hn_vf_thread_setup);
 	} else {
 		eth_dev = rte_eth_dev_attach_secondary(name);
 		if (!eth_dev) {
@@ -339,15 +343,20 @@ static int hn_dev_configure(struct rte_eth_dev *dev)
 		}
 	}
 
-	return 0;
+	return hn_vf_dev_configure(dev);
 }
 
 static int hn_dev_stats_get(struct rte_eth_dev *dev,
 			    struct rte_eth_stats *stats)
 {
 	unsigned int i;
+	int ret;
 
 	PMD_INIT_FUNC_TRACE();
+
+	ret = hn_vf_stats_get(dev, stats);
+	if (ret)
+		return ret;
 
 	for (i = 0; i < dev->data->nb_tx_queues; i++) {
 		const struct hn_tx_queue *txq = dev->data->tx_queues[i];
@@ -359,8 +368,8 @@ static int hn_dev_stats_get(struct rte_eth_dev *dev,
 		stats->oerrors += txq->stats.errors;
 
 		if (i < RTE_ETHDEV_QUEUE_STAT_CNTRS) {
-			stats->q_opackets[i] = txq->stats.packets;
-			stats->q_obytes[i] = txq->stats.bytes;
+			stats->q_opackets[i] += txq->stats.packets;
+			stats->q_obytes[i] += txq->stats.bytes;
 		}
 	}
 
@@ -375,12 +384,13 @@ static int hn_dev_stats_get(struct rte_eth_dev *dev,
 		stats->imissed += rxq->ring_full;
 
 		if (i < RTE_ETHDEV_QUEUE_STAT_CNTRS) {
-			stats->q_ipackets[i] = rxq->stats.packets;
-			stats->q_ibytes[i] = rxq->stats.bytes;
+			stats->q_ipackets[i] += rxq->stats.packets;
+			stats->q_ibytes[i] += rxq->stats.bytes;
 		}
 	}
 
-	stats->rx_nombuf = dev->data->rx_mbuf_alloc_failed;
+	stats->rx_nombuf += dev->data->rx_mbuf_alloc_failed;
+
 	return 0;
 }
 
@@ -391,7 +401,7 @@ hn_dev_stats_reset(struct rte_eth_dev *dev)
 
 	PMD_INIT_FUNC_TRACE();
 
-	PMD_INIT_FUNC_TRACE();
+	hn_vf_stats_reset(dev);
 
 	for (i = 0; i < dev->data->nb_tx_queues; i++) {
 		struct hn_tx_queue *txq = dev->data->tx_queues[i];
@@ -408,6 +418,7 @@ hn_dev_stats_reset(struct rte_eth_dev *dev)
 		memset(&rxq->stats, 0, sizeof(struct hn_stats));
 		rxq->ring_full = 0;
 	}
+
 }
 
 static int
@@ -499,6 +510,7 @@ static int
 hn_dev_start(struct rte_eth_dev *dev)
 {
 	struct hn_data *hv = dev->data->dev_private;
+	int ret;
 
 	PMD_INIT_FUNC_TRACE();
 
@@ -508,10 +520,19 @@ hn_dev_start(struct rte_eth_dev *dev)
 		return -ENOTSUP;
 	}
 
-	return hn_rndis_set_rxfilter(hv,
+	ret = hn_rndis_set_rxfilter(hv,
 				     NDIS_PACKET_TYPE_BROADCAST |
-				     NDIS_PACKET_TYPE_ALL_MULTICAST |
-				     NDIS_PACKET_TYPE_DIRECTED);
+				    NDIS_PACKET_TYPE_ALL_MULTICAST |
+				    NDIS_PACKET_TYPE_DIRECTED);
+	if (ret)
+		return ret;
+
+
+	ret = hn_vf_dev_start(dev);
+	if (ret)
+		hn_rndis_set_rxfilter(hv, 0);
+
+	return ret;
 }
 
 static void
@@ -522,12 +543,15 @@ hn_dev_stop(struct rte_eth_dev *dev)
 	PMD_INIT_FUNC_TRACE();
 
 	hn_rndis_set_rxfilter(hv, 0);
+	hn_vf_dev_stop(dev);
 }
 
 static void
-hn_dev_close(struct rte_eth_dev *dev __rte_unused)
+hn_dev_close(struct rte_eth_dev *dev)
 {
-	PMD_INIT_LOG(DEBUG, "close");
+	PMD_INIT_FUNC_TRACE();
+
+	hn_vf_dev_close(dev);
 }
 
 static const struct eth_dev_ops hn_eth_dev_ops = {
@@ -621,6 +645,12 @@ eth_hn_dev_init(struct rte_eth_dev *eth_dev)
 	hv->rxbuf_res = &vmbus->resource[HV_RECV_BUF_MAP];
 	hv->chim_res  = &vmbus->resource[HV_SEND_BUF_MAP];
 	hv->port_id = eth_dev->data->port_id;
+
+	rte_spinlock_init(&hv->vf_lock);
+	strlcpy(hv->owner.name, "netvsc", RTE_ETH_MAX_OWNER_NAME_LEN);
+	err = rte_eth_dev_owner_new(&hv->owner.id);
+	if (err)
+		goto failed;
 
 	/* Initialize primary channel input for control operations */
 	err = rte_vmbus_chan_open(vmbus, &hv->channels[0]);

@@ -764,21 +764,6 @@ hn_dev_rx_queue_release(void *arg)
 		rte_free(rxq);
 }
 
-static void
-hn_nvs_handle_notify(const struct vmbus_chanpkt_hdr *pkthdr,
-		     const void *data)
-{
-	const struct hn_nvs_hdr *hdr = data;
-
-	if (unlikely(vmbus_chanpkt_datalen(pkthdr) < sizeof(*hdr))) {
-		PMD_DRV_LOG(ERR, "invalid nvs notify");
-		return;
-	}
-
-	PMD_DRV_LOG(INFO,
-		    "got notify, nvs type %u", hdr->type);
-}
-
 /*
  * Process pending events on the channel.
  * Called from both Rx queue poll and Tx cleanup
@@ -806,7 +791,7 @@ void hn_process_events(struct hn_data *hv, uint16_t queue_id)
 		char event_buf[NVS_RESPSIZE_MAX];
 		uint32_t len = sizeof(event_buf);
 		const struct vmbus_chanpkt_hdr *pkt;
-		const void *data;
+		void *data;
 
 		ret = rte_vmbus_chan_recv_raw(rxq->chan, event_buf, &len);
 		if (ret == -ENOBUFS) {
@@ -830,7 +815,7 @@ void hn_process_events(struct hn_data *hv, uint16_t queue_id)
 			break;
 
 		case VMBUS_CHANPKT_TYPE_INBAND:
-			hn_nvs_handle_notify(pkt, data);
+			hn_nvs_handle_notify(dev, pkt, data);
 			break;
 
 		default:
@@ -1208,14 +1193,28 @@ hn_recv_pkts(void *prxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 {
 	struct hn_rx_queue *rxq = prxq;
 	struct hn_data *hv = rxq->hv;
+	struct rte_eth_dev *vf_dev = hv->vf_dev;
+	uint16_t nb_rcv;
 
 	if (unlikely(hv->closed))
 		return 0;
 
-	/* Get all outstanding receive completions */
+	/* make sure compiler doesn't optimize away access to hv->vf_dev */
+	rte_compiler_barrier();
+
+	/* Get all outstanding receive completions and notfication events*/
 	hn_process_events(hv, rxq->queue_id);
 
-	/* Get mbufs off staging ring */
-	return rte_ring_sc_dequeue_burst(rxq->rx_ring, (void **)rx_pkts,
-					 nb_pkts, NULL);
+	if (!vf_dev)
+		return rte_ring_sc_dequeue_burst(rxq->rx_ring, (void **)rx_pkts,
+						   nb_pkts, NULL);
+
+	/* Get mbufs some bufs off of staging ring */
+	nb_rcv = rte_ring_sc_dequeue_burst(rxq->rx_ring, (void **)rx_pkts,
+					   nb_pkts / 2, NULL);
+	/* And rest off of VF */
+	nb_rcv += rte_eth_rx_burst(vf_dev->data->port_id, rxq->queue_id,
+				   rx_pkts + nb_rcv, nb_pkts - nb_rcv);
+
+	return nb_rcv;
 }

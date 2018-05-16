@@ -79,6 +79,8 @@ struct hn_rx_queue {
 struct hn_data {
 	struct rte_vmbus_device *vmbus;
 	struct hn_rx_queue *primary;
+	struct rte_eth_dev *vf_dev;
+	rte_spinlock_t  vf_lock;
 	uint16_t	port_id;
 	bool		closed;
 	uint32_t	link_status;
@@ -107,6 +109,7 @@ struct hn_data {
 
 	struct ether_addr mac_addr;
 	struct vmbus_channel *channels[HN_MAX_CHANNELS];
+	struct rte_eth_dev_owner owner;
 };
 
 static inline struct vmbus_channel *
@@ -115,6 +118,7 @@ hn_primary_chan(const struct hn_data *hv)
 	return hv->channels[0];
 }
 
+void hn_vf_thread_setup(void);
 void hn_process_events(struct hn_data *hv, uint16_t queue_id);
 
 uint16_t hn_xmit_pkts(void *tx_queue, struct rte_mbuf **tx_pkts,
@@ -137,3 +141,11 @@ int	hn_dev_rx_queue_setup(struct rte_eth_dev *dev,
 			      const struct rte_eth_rxconf *rx_conf,
 			      struct rte_mempool *mp);
 void	hn_dev_rx_queue_release(void *arg);
+
+int	hn_vf_dev_configure(struct rte_eth_dev *dev);
+int	hn_vf_dev_start(struct rte_eth_dev *dev);
+void	hn_vf_dev_reset(struct rte_eth_dev *dev);
+void	hn_vf_dev_stop(struct rte_eth_dev *dev);
+void	hn_vf_dev_close(struct rte_eth_dev *dev);
+int	hn_vf_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats);
+void	hn_vf_stats_reset(struct rte_eth_dev *dev);
