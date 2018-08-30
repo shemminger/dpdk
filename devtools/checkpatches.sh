@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright 2015 6WIND S.A.
 

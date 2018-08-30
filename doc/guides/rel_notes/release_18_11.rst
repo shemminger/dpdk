@@ -54,6 +54,12 @@ New Features
      Also, make sure to start the actual text at the margin.
      =========================================================
 
+* **Added support for SR-IOV in netvsc PMD.**
+
+  The ``netvsc`` poll mode driver now supports the Accelerated Networking
+  SR-IOV option in Hyper-V and Azure. This is an alternative to the previous
+  vdev_netvsc, tap, and failsafe drivers combination.
+
 
 API Changes
 -----------
@@ -122,7 +128,7 @@ The libraries prepended with a plus sign were incremented in this version.
      librte_bus_fslmc.so.1
      librte_bus_pci.so.1
      librte_bus_vdev.so.1
-     librte_bus_vmbus.so.1
+   + librte_bus_vmbus.so.1
      librte_cfgfile.so.2
      librte_cmdline.so.2
      librte_common_octeontx.so.1
@@ -159,6 +165,7 @@ The libraries prepended with a plus sign were incremented in this version.
      librte_pmd_ring.so.2
      librte_pmd_softnic.so.1
      librte_pmd_vhost.so.2
+   + librte_pmd_netvsc.so.1
      librte_port.so.3
      librte_power.so.1
      librte_rawdev.so.1
@@ -185,6 +192,10 @@ Known Issues
    Also, make sure to start the actual text at the margin.
    =========================================================
 
+* When using SR-IOV (VF) support with netvsc PMD and the Mellanox mlx5 bifurcated
+  driver; the Linux netvsc device must be brought up before the netvsc device is
+  unbound and passed to the DPDK.
+
 
 Tested Platforms
 ----------------
@@ -204,4 +215,3 @@ Tested Platforms
    This section is a comment. Do not overwrite or remove it.
    Also, make sure to start the actual text at the margin.
    =========================================================
-
