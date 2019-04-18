@@ -31,7 +31,7 @@ exe2cmd = $(strip $(call dotfile,$(patsubst %,%.cmd,$(1))))
 
 ifeq ($(LINK_USING_CC),1)
 override EXTRA_LDFLAGS := $(call linkerprefix,$(EXTRA_LDFLAGS))
-O_TO_SO = $(CC) $(call linkerprefix,$(LDFLAGS)) $(LDFLAGS_$(@)) $(EXTRA_LDFLAGS) \
+O_TO_SO = $(CC) $(EXTRA_CFLAGS) $(call linkerprefix,$(LDFLAGS)) $(LDFLAGS_$(@)) $(EXTRA_LDFLAGS) \
 	-shared -o $@ $(OBJS-y) $(call linkerprefix,$(LDLIBS))
 else
 O_TO_SO = $(LD) $(LDFLAGS) $(LDFLAGS_$(@)) $(EXTRA_LDFLAGS) \
