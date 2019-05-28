@@ -3677,19 +3677,19 @@ int bnxt_hwrm_ctx_qstats(struct bnxt *bp, uint32_t cid, int idx,
 	HWRM_CHECK_RESULT();
 
 	if (rx) {
-		stats->q_ipackets[idx] = rte_le_to_cpu_64(resp->rx_ucast_pkts);
+		stats->q_ipackets[idx] += rte_le_to_cpu_64(resp->rx_ucast_pkts);
 		stats->q_ipackets[idx] += rte_le_to_cpu_64(resp->rx_mcast_pkts);
 		stats->q_ipackets[idx] += rte_le_to_cpu_64(resp->rx_bcast_pkts);
-		stats->q_ibytes[idx] = rte_le_to_cpu_64(resp->rx_ucast_bytes);
+		stats->q_ibytes[idx] += rte_le_to_cpu_64(resp->rx_ucast_bytes);
 		stats->q_ibytes[idx] += rte_le_to_cpu_64(resp->rx_mcast_bytes);
 		stats->q_ibytes[idx] += rte_le_to_cpu_64(resp->rx_bcast_bytes);
-		stats->q_errors[idx] = rte_le_to_cpu_64(resp->rx_err_pkts);
+		stats->q_errors[idx] += rte_le_to_cpu_64(resp->rx_err_pkts);
 		stats->q_errors[idx] += rte_le_to_cpu_64(resp->rx_drop_pkts);
 	} else {
-		stats->q_opackets[idx] = rte_le_to_cpu_64(resp->tx_ucast_pkts);
+		stats->q_opackets[idx] += rte_le_to_cpu_64(resp->tx_ucast_pkts);
 		stats->q_opackets[idx] += rte_le_to_cpu_64(resp->tx_mcast_pkts);
 		stats->q_opackets[idx] += rte_le_to_cpu_64(resp->tx_bcast_pkts);
-		stats->q_obytes[idx] = rte_le_to_cpu_64(resp->tx_ucast_bytes);
+		stats->q_obytes[idx] += rte_le_to_cpu_64(resp->tx_ucast_bytes);
 		stats->q_obytes[idx] += rte_le_to_cpu_64(resp->tx_mcast_bytes);
 		stats->q_obytes[idx] += rte_le_to_cpu_64(resp->tx_bcast_bytes);
 	}

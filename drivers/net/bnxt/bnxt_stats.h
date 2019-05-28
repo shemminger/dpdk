@@ -23,6 +23,10 @@ int bnxt_dev_xstats_get_by_id_op(struct rte_eth_dev *dev, const uint64_t *ids,
 int bnxt_dev_xstats_get_names_by_id_op(struct rte_eth_dev *dev,
 				struct rte_eth_xstat_name *xstats_names,
 				const uint64_t *ids, unsigned int limit);
+int bnxt_dev_queue_stats_mapping_set(struct rte_eth_dev *eth_dev,
+				     uint16_t queue_id, uint8_t stat_idx, uint8_t is_rx);
+
+
 
 struct bnxt_xstats_name_off {
 	char name[RTE_ETH_XSTATS_NAME_SIZE];

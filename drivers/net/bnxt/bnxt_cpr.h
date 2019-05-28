@@ -94,9 +94,11 @@ struct bnxt_cp_ring_info {
 	rte_iova_t		hw_stats_map;
 	uint32_t		hw_stats_ctx_id;
 
-	struct bnxt_ring	*cp_ring_struct;
 	uint16_t		cp_cons;
 	bool			valid;
+	uint8_t			sw_stats_id;
+
+	struct bnxt_ring	*cp_ring_struct;
 };
 
 #define RX_CMP_L2_ERRORS						\

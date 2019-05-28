@@ -399,8 +399,9 @@ int bnxt_stats_get_op(struct rte_eth_dev *eth_dev,
 		struct bnxt_rx_queue *rxq = bp->rx_queues[i];
 		struct bnxt_cp_ring_info *cpr = rxq->cp_ring;
 
-		rc = bnxt_hwrm_ctx_qstats(bp, cpr->hw_stats_ctx_id, i,
-				     bnxt_stats, 1);
+		rc = bnxt_hwrm_ctx_qstats(bp, cpr->hw_stats_ctx_id,
+					  cpr->sw_stats_id,
+					  bnxt_stats, 1);
 		if (unlikely(rc))
 			return rc;
 		bnxt_stats->rx_nombuf +=
@@ -414,8 +415,9 @@ int bnxt_stats_get_op(struct rte_eth_dev *eth_dev,
 		struct bnxt_tx_queue *txq = bp->tx_queues[i];
 		struct bnxt_cp_ring_info *cpr = txq->cp_ring;
 
-		rc = bnxt_hwrm_ctx_qstats(bp, cpr->hw_stats_ctx_id, i,
-				     bnxt_stats, 0);
+		rc = bnxt_hwrm_ctx_qstats(bp, cpr->hw_stats_ctx_id,
+					  cpr->sw_stats_id,
+					  bnxt_stats, 0);
 		if (unlikely(rc))
 			return rc;
 	}
@@ -683,4 +685,29 @@ int bnxt_dev_xstats_get_names_by_id_op(struct rte_eth_dev *dev,
 				xstats_names_copy[ids[i]].name);
 	}
 	return stat_cnt;
+}
+
+int bnxt_dev_queue_stats_mapping_set(struct rte_eth_dev *eth_dev,
+				     uint16_t queue_id,
+				     uint8_t stat_idx,
+				     uint8_t is_rx)
+{
+	struct bnxt *bp = eth_dev->data->dev_private;
+
+	PMD_DRV_LOG(DEBUG, "Setting port %u, %s queue_id %u to stat index %u\n",
+		     eth_dev->data->port_id, is_rx ? "RX" : "TX",
+		     queue_id, stat_idx);
+
+	if (is_rx) {
+		struct bnxt_rx_queue *rxq = bp->rx_queues[queue_id];
+		struct bnxt_cp_ring_info *cpr = rxq->cp_ring;
+
+		cpr->sw_stats_id = stat_idx;
+	} else {
+		struct bnxt_tx_queue *txq = bp->tx_queues[queue_id];
+		struct bnxt_cp_ring_info *cpr = txq->cp_ring;
+
+		cpr->sw_stats_id = stat_idx;
+	}
+	return 0;
 }
