@@ -10,6 +10,7 @@
 #include <errno.h>
 
 #include <rte_memory.h>
+#include <rte_ethdev.h>
 #include <rte_string_fns.h>
 
 #include "common.h"
@@ -45,27 +46,39 @@ parse_portmask(uint8_t max_ports, const char *portmask)
 {
 	char *end = NULL;
 	unsigned long pm;
-	uint16_t count = 0;
+	uint16_t count;
 
 	if (portmask == NULL || *portmask == '\0')
 		return -1;
 
 	/* convert parameter to a number and verify */
 	pm = strtoul(portmask, &end, 16);
-	if (end == NULL || *end != '\0' || pm == 0)
+	if (end == NULL || *end != '\0' || pm > UINT16_MAX || pm == 0)
 		return -1;
 
 	/* loop through bits of the mask and mark ports */
-	while (pm != 0){
-		if (pm & 0x01){ /* bit is set in mask, use port */
-			if (count >= max_ports)
-				printf("WARNING: requested port %u not present"
-				" - ignoring\n", (unsigned)count);
-			else
-			    ports->id[ports->num_ports++] = count;
+	for (count = 0; pm != 0; pm >>= 1, ++count) {
+		struct rte_eth_dev_owner owner;
+
+		if ((pm & 0x1) == 0)
+			continue;
+
+		if (count >= max_ports) {
+			printf("WARNING: requested port %u not present - ignoring\n",
+				count);
+			continue;
 		}
-		pm = (pm >> 1);
-		count++;
+		if (rte_eth_dev_owner_get(count, &owner) < 0) {
+			printf("ERROR: can not find port %u owner\n", count);
+			return -1;
+		}
+		if (owner.id != RTE_ETH_DEV_NO_OWNER) {
+			printf("ERROR: requested port %u is owned by device %s\n",
+					count, owner.name);
+			return -1;
+		}
+
+		ports->id[ports->num_ports++] = count;
 	}
 
 	return 0;
