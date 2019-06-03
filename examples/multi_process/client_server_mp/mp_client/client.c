@@ -235,6 +235,11 @@ main(int argc, char *argv[])
 	if (mz == NULL)
 		rte_exit(EXIT_FAILURE, "Cannot get port info structure\n");
 	ports = mz->addr;
+
+	uint16_t p;
+	for (p  = 0; p < ports->num_ports; p++)
+		RTE_LOG(INFO, APP, "%u is port %u\n", p, ports->id[p]);
+
 	tx_stats = &(ports->tx_stats[client_id]);
 
 	configure_output_ports(ports);
