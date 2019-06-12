@@ -601,13 +601,29 @@ hn_dev_xstats_get(struct rte_eth_dev *dev,
 	return count + ret;
 }
 
+static void tprintf(const char *fmt, ...)
+{
+	struct timeval tv;
+	char buf[64];
+	va_list ap;
+
+	gettimeofday(&tv, NULL);
+	strftime(buf, sizeof(buf), "%T", localtime(&tv.tv_sec));
+	printf("%s.%06lu: ", buf, tv.tv_usec);
+
+	va_start(ap, fmt);
+	vprintf(fmt, ap);
+	va_end(ap);
+}
+
 static int
 hn_dev_start(struct rte_eth_dev *dev)
 {
 	struct hn_data *hv = dev->data->dev_private;
 	int error;
 
-	PMD_INIT_FUNC_TRACE();
+	// PMD_INIT_FUNC_TRACE();
+	tprintf("%s enter\n", __func__);
 
 	error = hn_rndis_set_rxfilter(hv,
 				      NDIS_PACKET_TYPE_BROADCAST |
@@ -616,10 +632,13 @@ hn_dev_start(struct rte_eth_dev *dev)
 	if (error)
 		return error;
 
+	tprintf("hn_vf_start called\n");
 	error = hn_vf_start(dev);
+	tprintf("hn_vf_start ret %d\n", ret);
 	if (error)
 		hn_rndis_set_rxfilter(hv, 0);
 
+	tprintf("%s exit\n", __func__);
 	return error;
 }
 

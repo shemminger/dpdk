@@ -801,6 +801,21 @@ kni_change_mtu(uint16_t port_id, unsigned int new_mtu)
 	return 0;
 }
 
+static void tprintf(const char *fmt, ...)
+{
+	struct timeval tv;
+	char buf[64];
+	va_list ap;
+
+	gettimeofday(&tv, NULL);
+	strftime(buf, sizeof(buf), "%T", localtime(&tv.tv_sec));
+	printf("%s.%06lu: ", buf, tv.tv_usec);
+
+	va_start(ap, fmt);
+	vprintf(fmt, ap);
+	va_end(ap);
+}
+
 /* Callback for request of configuring network interface up/down */
 static int
 kni_config_network_interface(uint16_t port_id, uint8_t if_up)
@@ -812,14 +827,16 @@ kni_config_network_interface(uint16_t port_id, uint8_t if_up)
 		return -EINVAL;
 	}
 
-	RTE_LOG(INFO, APP, "Configure network interface of %d %s\n",
-					port_id, if_up ? "up" : "down");
+	tprintf("Configure network interface of %d %s\n",
+		port_id, if_up ? "up" : "down");
 
 	rte_atomic32_inc(&kni_pause);
 
 	if (if_up != 0) { /* Configure network interface up */
 		rte_eth_dev_stop(port_id);
+		tprintf(" Port stopped\n");
 		ret = rte_eth_dev_start(port_id);
+		tprintf(" Dev start ret %d\n", ret);
 	} else /* Configure network interface down */
 		rte_eth_dev_stop(port_id);
 
