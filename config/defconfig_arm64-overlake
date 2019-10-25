@@ -1,0 +1,5 @@
+# Reduced configuration for Broadcom SOC
+
+#include "defconfig_arm64-stingray-linuxapp-gcc"
+
+#include "common_overlake"

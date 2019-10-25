@@ -1,0 +1,6 @@
+# Reduced configuration for running on x86
+# with Broadcom NIC
+
+#include "defconfig_x86_64-native-linuxapp-gcc"
+
+#include "common_overlake"
