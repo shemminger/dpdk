@@ -388,6 +388,7 @@ int vmbus_uio_get_subchan(struct vmbus_channel *primary,
 			  chan_path, strerror(errno));
 		return -errno;
 	}
+	VMBUS_LOG(DEBUG, "scan %s", chan_path);
 
 	while ((ent = readdir(chan_dir))) {
 		unsigned long relid, subid, monid;
@@ -396,6 +397,7 @@ int vmbus_uio_get_subchan(struct vmbus_channel *primary,
 		if (ent->d_name[0] == '.')
 			continue;
 
+		VMBUS_LOG(DEBUG, "sub-channel %s", ent->d_name);
 		errno = 0;
 		relid = strtoul(ent->d_name, &endp, 0);
 		if (*endp || errno != 0 || relid > UINT16_MAX) {
@@ -411,8 +413,13 @@ int vmbus_uio_get_subchan(struct vmbus_channel *primary,
 		}
 
 		if (!vmbus_uio_ring_present(dev, relid)) {
+			char cmd[PATH_MAX];
+
 			VMBUS_LOG(DEBUG, "ring mmap not found (yet) for: %lu",
 				  relid);
+			snprintf(cmd, sizeof(cmd),
+				 "ls %s/%s", chan_path, ent->d_name);
+			system(cmd);
 			continue;
 		}
 
