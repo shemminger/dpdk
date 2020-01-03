@@ -1327,6 +1327,7 @@ rte_eal_cleanup(void)
 	rte_service_finalize();
 	rte_mp_channel_cleanup();
 	eal_cleanup_config(&internal_config);
+	rte_eal_log_cleanup();
 	return 0;
 }
 

@@ -91,6 +91,12 @@ int rte_eal_memzone_init(void);
 void eal_log_set_default(FILE *default_log);
 
 /**
+ * Common log cleanup function (private to eal).
+ * Closes the default log stream. Called from rte_eal_cleanup().
+ */
+void eal_log_cleanup(void);
+
+/**
  * Fill configuration with number of physical and logical processors
  *
  * This function is private to EAL.
@@ -150,6 +156,13 @@ int rte_eal_timer_init(void);
  *   0 on success, negative on error
  */
 int rte_eal_log_init(const char *id, int facility);
+
+/**
+ * Close the default log stream
+ *
+ * This function is private to EAL.
+ */
+void rte_eal_log_cleanup(void);
 
 /**
  * Save the log regexp for later

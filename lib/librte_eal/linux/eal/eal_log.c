@@ -37,8 +37,16 @@ console_log_write(__attribute__((unused)) void *c, const char *buf, size_t size)
 	return ret;
 }
 
+static int
+console_log_close(__attribute__((unused)) void *c)
+{
+	closelog();
+	return 0;
+}
+
 static cookie_io_functions_t console_log_func = {
 	.write = console_log_write,
+	.close = console_log_close,
 };
 
 /*
@@ -59,4 +67,10 @@ rte_eal_log_init(const char *id, int facility)
 	eal_log_set_default(log_stream);
 
 	return 0;
+}
+
+void
+rte_eal_log_cleanup(void)
+{
+	eal_log_cleanup();
 }

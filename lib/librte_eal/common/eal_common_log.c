@@ -463,3 +463,15 @@ eal_log_set_default(FILE *default_log)
 		"Debug dataplane logs available - lower performance\n");
 #endif
 }
+
+/*
+ * Called by envrionment-specific cleanup function.
+ */
+void
+eal_log_cleanup(void)
+{
+	if (default_log_stream) {
+		fclose(default_log_stream);
+		default_log_stream = NULL;
+	}
+}
