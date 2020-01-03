@@ -1136,6 +1136,15 @@ rte_eal_intr_init(void)
 	return ret;
 }
 
+void
+rte_eal_intr_cleanup(void)
+{
+	pthread_cancel(intr_thread);
+	pthread_join(intr_thread, NULL);
+	close(intr_pipe.readfd);
+	close(intr_pipe.writefd);
+}
+
 static void
 eal_intr_proc_rxtx_intr(int fd, const struct rte_intr_handle *intr_handle)
 {

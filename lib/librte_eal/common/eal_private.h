@@ -192,6 +192,16 @@ int rte_eal_tailqs_init(void);
 int rte_eal_intr_init(void);
 
 /**
+ * Cleanup interrupt handling.
+ *
+ * This function is private to EAL.
+ *
+ * @return
+ *  0 on success, negative on error
+ */
+void rte_eal_intr_cleanup(void);
+
+/**
  * Init alarm mechanism. This is to allow a callback be called after
  * specific time.
  *

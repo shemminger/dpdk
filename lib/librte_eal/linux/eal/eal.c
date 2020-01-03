@@ -1338,6 +1338,7 @@ rte_eal_cleanup(void)
 	}
 
 	rte_service_finalize();
+	rte_eal_intr_cleanup();
 	rte_eal_alarm_cleanup();
 	rte_mp_channel_cleanup();
 	eal_cleanup_config(&internal_config);
