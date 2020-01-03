@@ -1319,11 +1319,24 @@ mark_freeable(const struct rte_memseg_list *msl, const struct rte_memseg *ms,
 int
 rte_eal_cleanup(void)
 {
+	int i;
+
 	/* if we're in a primary process, we need to mark hugepages as freeable
 	 * so that finalization can release them back to the system.
 	 */
 	if (rte_eal_process_type() == RTE_PROC_PRIMARY)
 		rte_memseg_walk(mark_freeable, NULL);
+
+	RTE_LCORE_FOREACH_SLAVE(i) {
+		pthread_cancel(lcore_config[i].thread_id);
+		pthread_join(lcore_config[i].thread_id, NULL);
+
+		close(lcore_config[i].pipe_master2slave[0]);
+		close(lcore_config[i].pipe_master2slave[1]);
+		close(lcore_config[i].pipe_slave2master[0]);
+		close(lcore_config[i].pipe_slave2master[1]);
+	}
+
 	rte_service_finalize();
 	rte_eal_alarm_cleanup();
 	rte_mp_channel_cleanup();
