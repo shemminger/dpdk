@@ -14,6 +14,7 @@
 #include <rte_eal.h>
 #include <rte_log.h>
 #include <rte_per_lcore.h>
+#include <rte_tailq.h>
 
 #include "eal_private.h"
 
@@ -54,7 +55,7 @@ struct log_cur_msg {
 };
 
 struct rte_log_dynamic_type {
-	const char *name;
+	char *name;
 	uint32_t loglevel;
 };
 
@@ -470,8 +471,23 @@ eal_log_set_default(FILE *default_log)
 void
 eal_log_cleanup(void)
 {
+	struct rte_eal_opt_loglevel *opt_ll, *tmp;
+	size_t i;
+
 	if (default_log_stream) {
 		fclose(default_log_stream);
 		default_log_stream = NULL;
 	}
+
+	TAILQ_FOREACH_SAFE(opt_ll, &opt_loglevel_list, next, tmp) {
+		free(opt_ll->pattern);
+		free(opt_ll);
+	}
+
+	for (i = 0; i < rte_logs.dynamic_types_len; i++)
+		free(rte_logs.dynamic_types[i].name);
+
+	rte_logs.dynamic_types_len = 0;
+	free(rte_logs.dynamic_types);
+	rte_logs.dynamic_types = NULL;
 }
