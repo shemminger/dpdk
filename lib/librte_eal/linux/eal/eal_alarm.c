@@ -6,6 +6,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/queue.h>
 #include <sys/time.h>
 #include <sys/timerfd.h>
@@ -70,6 +71,16 @@ rte_eal_alarm_init(void)
 error:
 	rte_errno = errno;
 	return -1;
+}
+
+void
+rte_eal_alarm_cleanup(void)
+{
+	if (intr_handle.fd == -1)
+		return;
+
+	close(intr_handle.fd);
+	intr_handle.fd = -1;
 }
 
 static void

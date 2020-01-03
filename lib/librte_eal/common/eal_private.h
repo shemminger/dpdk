@@ -203,6 +203,13 @@ int rte_eal_intr_init(void);
 int rte_eal_alarm_init(void);
 
 /**
+ * Cleanup alarm resources.
+ *
+ * This function is private to EAL.
+ */
+void rte_eal_alarm_cleanup(void);
+
+/**
  * Function is to check if the kernel module(like, vfio, vfio_iommu_type1,
  * etc.) loaded.
  *

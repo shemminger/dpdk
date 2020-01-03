@@ -1325,6 +1325,7 @@ rte_eal_cleanup(void)
 	if (rte_eal_process_type() == RTE_PROC_PRIMARY)
 		rte_memseg_walk(mark_freeable, NULL);
 	rte_service_finalize();
+	rte_eal_alarm_cleanup();
 	rte_mp_channel_cleanup();
 	eal_cleanup_config(&internal_config);
 	rte_eal_log_cleanup();
