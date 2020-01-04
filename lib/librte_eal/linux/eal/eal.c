@@ -1346,6 +1346,12 @@ rte_eal_cleanup(void)
 	rte_mp_channel_cleanup();
 	eal_cleanup_config(&internal_config);
 	rte_eal_log_cleanup();
+
+	if (mem_cfg_fd != -1) {
+		close(mem_cfg_fd);
+		mem_cfg_fd = -1;
+	}
+
 	return 0;
 }
 
