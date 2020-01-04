@@ -1032,6 +1032,19 @@ eal_intr_handle_interrupts(int pfd, unsigned totalfds)
 	}
 }
 
+
+/**
+ * Callback at end of intr_thread loop or if thread is cancelled
+ * that closes the epoll file descriptor
+ */
+static void
+eal_intr_thread_close(void *arg)
+{
+	int pfd = (int)(unsigned long)arg;
+
+	close(pfd);
+}
+
 /**
  * It builds/rebuilds up the epoll file descriptor with all the
  * file descriptors being waited on. Then handles the interrupts.
@@ -1062,6 +1075,12 @@ eal_intr_thread_main(__rte_unused void *arg)
 		int pfd = epoll_create(1);
 		if (pfd < 0)
 			rte_panic("Cannot create epoll instance\n");
+
+		/* close pfd on thread exit or cancel_pop
+		 * see man page for restrictions on this macro.
+		 */
+		pthread_cleanup_push(eal_intr_thread_close,
+				     (void *)(unsigned long)pfd);
 
 		pipe_event.data.fd = intr_pipe.readfd;
 		/**
@@ -1099,11 +1118,8 @@ eal_intr_thread_main(__rte_unused void *arg)
 		/* serve the interrupt */
 		eal_intr_handle_interrupts(pfd, numfds);
 
-		/**
-		 * when we return, we need to rebuild the
-		 * list of fds to monitor.
-		 */
-		close(pfd);
+		/* close pfd and rebuild the list */
+		pthread_cleanup_pop(1);
 	}
 }
 
