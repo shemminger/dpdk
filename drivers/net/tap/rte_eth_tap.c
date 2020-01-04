@@ -1035,6 +1035,11 @@ tap_dev_close(struct rte_eth_dev *dev)
 				&internals->remote_initial_flags);
 	}
 
+	if (internals->nlsk_fd != -1) {
+		close(internals->nlsk_fd);
+		internals->nlsk_fd = -1;
+	}
+
 	if (internals->ka_fd != -1) {
 		close(internals->ka_fd);
 		internals->ka_fd = -1;
@@ -2406,7 +2411,7 @@ rte_pmd_tap_remove(struct rte_vdev_device *dev)
 	TAP_LOG(DEBUG, "Closing %s Ethernet device on numa %u",
 		tuntap_types[internals->type], rte_socket_id());
 
-	if (internals->nlsk_fd) {
+	if (internals->nlsk_fd != -1) {
 		tap_flow_flush(eth_dev, NULL);
 		tap_flow_implicit_flush(internals, NULL);
 		tap_nl_final(internals->nlsk_fd);
