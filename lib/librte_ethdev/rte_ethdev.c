@@ -1717,7 +1717,7 @@ rte_eth_dev_close(uint16_t port_id)
 		rte_eth_dev_release_port(dev);
 		return;
 	}
-	RTE_ETHDEV_LOG(DEBUG, "Port closing is using an old behaviour.\n"
+	RTE_ETHDEV_LOG(NOTICE, "Port closing is using an old behaviour.\n"
 			"The driver %s should migrate to the new behaviour.\n",
 			dev->device->driver->name);
 	/* old behaviour: only free queue arrays */
