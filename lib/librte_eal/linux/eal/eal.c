@@ -1343,6 +1343,7 @@ rte_eal_cleanup(void)
 #endif
 	rte_eal_intr_cleanup();
 	rte_eal_alarm_cleanup();
+	eal_mp_dev_hotplug_cleanup();
 	rte_mp_channel_cleanup();
 	eal_plugins_cleanup();
 	eal_cleanup_config(&internal_config);
