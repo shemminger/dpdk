@@ -308,6 +308,18 @@ eal_plugins_init(void)
 	return 0;
 }
 
+void
+eal_plugins_cleanup(void)
+{
+	struct shared_driver *solib, *tmp;
+
+	TAILQ_FOREACH_SAFE(solib, &solib_list, next, tmp) {
+		if (solib->lib_handle)
+			dlclose(solib->lib_handle);
+		free(solib);
+	}
+}
+
 /*
  * Parse the coremask given as argument (hexadecimal string) and fill
  * the global configuration (core role and core count) with the parsed

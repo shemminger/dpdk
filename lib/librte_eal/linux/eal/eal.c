@@ -1344,6 +1344,7 @@ rte_eal_cleanup(void)
 	rte_eal_intr_cleanup();
 	rte_eal_alarm_cleanup();
 	rte_mp_channel_cleanup();
+	eal_plugins_cleanup();
 	eal_cleanup_config(&internal_config);
 	rte_eal_log_cleanup();
 

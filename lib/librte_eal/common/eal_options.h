@@ -84,5 +84,6 @@ int eal_check_common_options(struct internal_config *internal_cfg);
 void eal_common_usage(void);
 enum rte_proc_type_t eal_proc_type_detect(void);
 int eal_plugins_init(void);
+void eal_plugins_cleanup(void);
 
 #endif /* EAL_OPTIONS_H */
