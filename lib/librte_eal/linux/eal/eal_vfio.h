@@ -119,6 +119,7 @@ struct vfio_iommu_type {
 
 /* get the vfio container that devices are bound to by default */
 int vfio_get_default_container_fd(void);
+void vfio_close_default_container(void);
 
 /* pick IOMMU type. returns a pointer to vfio_iommu_type or NULL for error */
 const struct vfio_iommu_type *

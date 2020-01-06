@@ -1059,6 +1059,15 @@ vfio_get_default_container_fd(void)
 	return -1;
 }
 
+void
+vfio_close_default_container(void)
+{
+	if (default_vfio_cfg->vfio_enabled) {
+		close(default_vfio_cfg->vfio_container_fd);
+		default_vfio_cfg->vfio_enabled = 0;
+	}
+}
+
 int
 vfio_get_iommu_type(void)
 {

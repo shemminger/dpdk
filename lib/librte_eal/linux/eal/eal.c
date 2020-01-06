@@ -1340,6 +1340,7 @@ rte_eal_cleanup(void)
 	rte_service_finalize();
 #ifdef VFIO_PRESENT
 	vfio_mp_sync_cleanup();
+	vfio_close_default_container();
 #endif
 	rte_eal_intr_cleanup();
 	rte_eal_alarm_cleanup();
