@@ -3,4 +3,7 @@
 
 #include "defconfig_x86_64-native-linuxapp-gcc"
 
+# Use older architecture to avoid valgrind issues
+CONFIG_RTE_MACHINE="westmere"
+
 #include "common_overlake"
