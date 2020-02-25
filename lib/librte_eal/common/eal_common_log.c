@@ -464,30 +464,3 @@ eal_log_set_default(FILE *default_log)
 		"Debug dataplane logs available - lower performance\n");
 #endif
 }
-
-/*
- * Called by envrionment-specific cleanup function.
- */
-void
-eal_log_cleanup(void)
-{
-	struct rte_eal_opt_loglevel *opt_ll, *tmp;
-	size_t i;
-
-	if (default_log_stream) {
-		fclose(default_log_stream);
-		default_log_stream = NULL;
-	}
-
-	TAILQ_FOREACH_SAFE(opt_ll, &opt_loglevel_list, next, tmp) {
-		free(opt_ll->pattern);
-		free(opt_ll);
-	}
-
-	for (i = 0; i < rte_logs.dynamic_types_len; i++)
-		free(rte_logs.dynamic_types[i].name);
-
-	rte_logs.dynamic_types_len = 0;
-	free(rte_logs.dynamic_types);
-	rte_logs.dynamic_types = NULL;
-}
