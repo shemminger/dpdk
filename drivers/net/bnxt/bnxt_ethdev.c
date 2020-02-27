@@ -757,8 +757,7 @@ bnxt_receive_function(struct rte_eth_dev *eth_dev)
 {
 	struct bnxt *bp = eth_dev->data->dev_private;
 
-#ifdef RTE_ARCH_X86
-#ifndef RTE_LIBRTE_IEEE1588
+#ifdef RTE_BNXT_INC_VECTOR
 	/*
 	 * Vector mode receive can be enabled only if scatter rx is not
 	 * in use and rx offloads are limited to VLAN stripping and
@@ -788,7 +787,6 @@ bnxt_receive_function(struct rte_eth_dev *eth_dev)
 		    eth_dev->data->scattered_rx,
 		    eth_dev->data->dev_conf.rxmode.offloads);
 #endif
-#endif
 	bp->flags &= ~BNXT_FLAG_RX_VECTOR_PKT_MODE;
 	return bnxt_recv_pkts;
 }
@@ -796,8 +794,7 @@ bnxt_receive_function(struct rte_eth_dev *eth_dev)
 static eth_tx_burst_t
 bnxt_transmit_function(__rte_unused struct rte_eth_dev *eth_dev)
 {
-#ifdef RTE_ARCH_X86
-#ifndef RTE_LIBRTE_IEEE1588
+#ifdef RTE_BNXT_INC_VECTOR
 	/*
 	 * Vector mode transmit can be enabled only if not using scatter rx
 	 * or tx offloads.
@@ -815,7 +812,6 @@ bnxt_transmit_function(__rte_unused struct rte_eth_dev *eth_dev)
 		    eth_dev->data->port_id,
 		    eth_dev->data->scattered_rx,
 		    eth_dev->data->dev_conf.txmode.offloads);
-#endif
 #endif
 	return bnxt_xmit_pkts;
 }
@@ -2242,7 +2238,7 @@ int bnxt_mtu_set_op(struct rte_eth_dev *eth_dev, uint16_t new_mtu)
 	new_pkt_size = new_mtu + RTE_ETHER_HDR_LEN + RTE_ETHER_CRC_LEN +
 		       VLAN_TAG_SIZE * BNXT_NUM_VLANS;
 
-#ifdef RTE_ARCH_X86
+#ifdef RTE_BNXT_INC_VECTOR
 	/*
 	 * If vector-mode tx/rx is active, disallow any MTU change that would
 	 * require scattered receive support.
