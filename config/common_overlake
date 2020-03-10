@@ -6,6 +6,9 @@ CONFIG_RTE_ETHDEV_QUEUE_STAT_CNTRS=64
 # Build shared libraries
 CONFIG_RTE_BUILD_SHARED_LIB=y
 
+# Disable vector (for mark)
+CONFIG_RTE_LIBRTE_BNXT_INC_VECTOR=n
+
 # Disable test application
 CONFIG_RTE_APP_TEST=n
 CONFIG_RTE_PROC_INFO=n
