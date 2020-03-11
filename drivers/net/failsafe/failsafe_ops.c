@@ -819,37 +819,54 @@ fs_link_update(struct rte_eth_dev *dev,
 	return -1;
 }
 
+static void
+fs_stats_increment(struct rte_eth_stats *to,
+		   const struct rte_eth_stats *from)
+{
+	uint32_t i;
+
+	to->ipackets += from->ipackets;
+	to->opackets += from->opackets;
+	to->ibytes += from->ibytes;
+	to->obytes += from->obytes;
+	to->imissed += from->imissed;
+	to->ierrors += from->ierrors;
+	to->oerrors += from->oerrors;
+	to->rx_nombuf += from->rx_nombuf;
+	for (i = 0; i < RTE_ETHDEV_QUEUE_STAT_CNTRS; i++) {
+		to->q_ipackets[i] += from->q_ipackets[i];
+		to->q_opackets[i] += from->q_opackets[i];
+		to->q_ibytes[i] += from->q_ibytes[i];
+		to->q_obytes[i] += from->q_obytes[i];
+		to->q_errors[i] += from->q_errors[i];
+	}
+}
+
 static int
 fs_stats_get(struct rte_eth_dev *dev,
 	     struct rte_eth_stats *stats)
 {
-	struct rte_eth_stats backup;
 	struct sub_device *sdev;
 	uint8_t i;
-	int ret;
 
 	fs_lock(dev, 0);
-	rte_memcpy(stats, &PRIV(dev)->stats_accumulator, sizeof(*stats));
-	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE) {
-		struct rte_eth_stats *snapshot = &sdev->stats_snapshot.stats;
-		uint64_t *timestamp = &sdev->stats_snapshot.timestamp;
 
-		rte_memcpy(&backup, snapshot, sizeof(backup));
-		ret = rte_eth_stats_get(PORT_ID(sdev), snapshot);
+	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE) {
+		struct rte_eth_stats sub_stats;
+		int ret;
+
+		ret = rte_eth_stats_get(PORT_ID(sdev), &sub_stats);
 		if (ret) {
-			if (!fs_err(sdev, ret)) {
-				rte_memcpy(snapshot, &backup, sizeof(backup));
-				goto inc;
-			}
+			if (!fs_err(sdev, ret))
+				continue;
+
 			ERROR("Operation rte_eth_stats_get failed for sub_device %d with error %d",
 				  i, ret);
-			*timestamp = 0;
 			fs_unlock(dev, 0);
 			return ret;
 		}
-		*timestamp = rte_rdtsc();
-inc:
-		failsafe_stats_increment(stats, snapshot);
+
+		fs_stats_increment(stats, &sub_stats);
 	}
 	fs_unlock(dev, 0);
 	return 0;
@@ -874,9 +891,8 @@ fs_stats_reset(struct rte_eth_dev *dev)
 			fs_unlock(dev, 0);
 			return ret;
 		}
-		memset(&sdev->stats_snapshot, 0, sizeof(struct rte_eth_stats));
 	}
-	memset(&PRIV(dev)->stats_accumulator, 0, sizeof(struct rte_eth_stats));
+
 	fs_unlock(dev, 0);
 
 	return 0;

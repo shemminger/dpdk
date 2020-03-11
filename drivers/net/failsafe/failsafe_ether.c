@@ -311,29 +311,6 @@ fs_dev_remove(struct sub_device *sdev)
 	failsafe_hotplug_alarm_install(fs_dev(sdev));
 }
 
-static void
-fs_dev_stats_save(struct sub_device *sdev)
-{
-	struct rte_eth_stats stats;
-	int err;
-
-	/* Attempt to read current stats. */
-	err = rte_eth_stats_get(PORT_ID(sdev), &stats);
-	if (err) {
-		uint64_t timestamp = sdev->stats_snapshot.timestamp;
-
-		WARN("Could not access latest statistics from sub-device %d.\n",
-			 SUB_ID(sdev));
-		if (timestamp != 0)
-			WARN("Using latest snapshot taken before %"PRIu64" seconds.\n",
-				 (rte_rdtsc() - timestamp) / rte_get_tsc_hz());
-	}
-	failsafe_stats_increment
-		(&PRIV(fs_dev(sdev))->stats_accumulator,
-		err ? &sdev->stats_snapshot.stats : &stats);
-	memset(&sdev->stats_snapshot, 0, sizeof(sdev->stats_snapshot));
-}
-
 static inline int
 fs_rxtx_clean(struct sub_device *sdev)
 {
@@ -387,7 +364,6 @@ failsafe_dev_remove(struct rte_eth_dev *dev)
 		if (sdev->remove && fs_rxtx_clean(sdev)) {
 			if (fs_lock(dev, 1) != 0)
 				return;
-			fs_dev_stats_save(sdev);
 			fs_dev_remove(sdev);
 			fs_unlock(dev, 1);
 		}
@@ -545,29 +521,6 @@ err_remove:
 		if (sdev->state != PRIV(dev)->state)
 			sdev->remove = 1;
 	return ret;
-}
-
-void
-failsafe_stats_increment(struct rte_eth_stats *to, struct rte_eth_stats *from)
-{
-	uint32_t i;
-
-	RTE_ASSERT(to != NULL && from != NULL);
-	to->ipackets += from->ipackets;
-	to->opackets += from->opackets;
-	to->ibytes += from->ibytes;
-	to->obytes += from->obytes;
-	to->imissed += from->imissed;
-	to->ierrors += from->ierrors;
-	to->oerrors += from->oerrors;
-	to->rx_nombuf += from->rx_nombuf;
-	for (i = 0; i < RTE_ETHDEV_QUEUE_STAT_CNTRS; i++) {
-		to->q_ipackets[i] += from->q_ipackets[i];
-		to->q_opackets[i] += from->q_opackets[i];
-		to->q_ibytes[i] += from->q_ibytes[i];
-		to->q_obytes[i] += from->q_obytes[i];
-		to->q_errors[i] += from->q_errors[i];
-	}
 }
 
 int

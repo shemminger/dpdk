@@ -95,11 +95,6 @@ enum dev_state {
 	DEV_STARTED,
 };
 
-struct fs_stats {
-	struct rte_eth_stats stats;
-	uint64_t timestamp;
-};
-
 /*
  * Allocated in shared memory.
  */
@@ -112,8 +107,6 @@ struct sub_device {
 	uint8_t sid;
 	/* Device state machine */
 	enum dev_state state;
-	/* Last stats snapshot passed to user */
-	struct fs_stats stats_snapshot;
 	/* Some device are defined as a command line */
 	char *cmdline;
 	/* Others are retrieved through a file descriptor */
@@ -167,7 +160,6 @@ struct fs_priv {
 	 * synchronized state.
 	 */
 	enum dev_state state;
-	struct rte_eth_stats stats_accumulator;
 	/*
 	 * Rx interrupts/events proxy.
 	 * The PMD issues Rx events to the EAL on behalf of its subdevices,
@@ -229,8 +221,6 @@ int failsafe_eal_uninit(struct rte_eth_dev *dev);
 int failsafe_eth_dev_state_sync(struct rte_eth_dev *dev);
 void failsafe_eth_dev_unregister_callbacks(struct sub_device *sdev);
 void failsafe_dev_remove(struct rte_eth_dev *dev);
-void failsafe_stats_increment(struct rte_eth_stats *to,
-				struct rte_eth_stats *from);
 int failsafe_eth_rmv_event_callback(uint16_t port_id,
 				    enum rte_eth_event_type type,
 				    void *arg, void *out);
