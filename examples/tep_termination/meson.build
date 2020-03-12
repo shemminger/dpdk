@@ -9,6 +9,7 @@
 if not is_linux
 	build = false
 endif
+allow_experimental_apis = true
 deps += ['hash', 'vhost']
 cflags += '-Wno-deprecated-declarations'
 sources = files(

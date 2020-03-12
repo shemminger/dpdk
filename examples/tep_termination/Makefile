@@ -26,6 +26,7 @@ CFLAGS += -O3 $(shell $(PKGCONF) --cflags libdpdk)
 LDFLAGS_SHARED = $(shell $(PKGCONF) --libs libdpdk)
 LDFLAGS_STATIC = -Wl,-Bstatic $(shell $(PKGCONF) --static --libs libdpdk)
 
+CFLAGS += -DALLOW_EXPERIMENTAL_API
 CFLAGS += -Wno-deprecated-declarations
 
 build/$(APP)-shared: $(SRCS-y) Makefile $(PC_FILE) | build
@@ -61,6 +62,7 @@ endif
 CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS)
 CFLAGS += -Wno-deprecated-declarations
+CFLAGS += -DALLOW_EXPERIMENTAL_API
 
 include $(RTE_SDK)/mk/rte.extapp.mk
 endif
