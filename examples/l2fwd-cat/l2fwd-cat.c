@@ -42,6 +42,9 @@ port_init(uint16_t port, struct rte_mempool *mbuf_pool)
 	if (!rte_eth_dev_is_valid_port(port))
 		return -1;
 
+	if (!rte_eth_dev_is_owned_by(portid, RTE_ETH_DEV_NO_OWNER)) {
+		return -1;
+
 	/* Configure the Ethernet device. */
 	retval = rte_eth_dev_configure(port, rx_rings, tx_rings, &port_conf);
 	if (retval != 0)

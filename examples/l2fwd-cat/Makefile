@@ -20,6 +20,7 @@ static: build/$(APP)-static
 PKGCONF ?= pkg-config
 
 PC_FILE := $(shell $(PKGCONF) --path libdpdk 2>/dev/null)
+CFLAGS += -DALLOW_EXPERIMENTAL_API
 CFLAGS += -O3 $(shell $(PKGCONF) --cflags libdpdk)
 LDFLAGS_SHARED = $(shell $(PKGCONF) --libs libdpdk)
 LDFLAGS_STATIC = -Wl,-Bstatic $(shell $(PKGCONF) --static --libs libdpdk)
@@ -65,6 +66,7 @@ endif
 
 EXTRA_CFLAGS += -O3 -g -Wfatal-errors
 
+CFLAGS += -DALLOW_EXPERIMENTAL_API
 CFLAGS += -I$(PQOS_INSTALL_PATH)/../include
 
 LDLIBS += -L$(PQOS_INSTALL_PATH)
