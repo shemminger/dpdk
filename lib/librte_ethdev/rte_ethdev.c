@@ -686,6 +686,15 @@ rte_eth_dev_owner_unset(const uint16_t port_id, const uint64_t owner_id)
 }
 
 int
+rte_eth_dev_is_owned_by(uint16_t port_id, uint64_t owner_id)
+{
+	if (!rte_eth_dev_is_valid_port(port_id))
+		return 0;
+
+	return rte_eth_devices[port_id].data->owner.id == owner_id;
+}
+
+int
 rte_eth_dev_owner_delete(const uint64_t owner_id)
 {
 	uint16_t port_id;

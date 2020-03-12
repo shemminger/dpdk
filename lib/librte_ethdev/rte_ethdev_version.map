@@ -230,4 +230,7 @@ EXPERIMENTAL {
 
 	# added in 20.02
 	rte_flow_dev_dump;
+
+	# added in 20.05
+	rte_eth_dev_is_owned_by;
 };

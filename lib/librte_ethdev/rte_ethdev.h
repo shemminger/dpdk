@@ -1531,6 +1531,21 @@ uint64_t rte_eth_find_next_owned_by(uint16_t port_id,
 	     p = rte_eth_find_next_owned_by(p + 1, o))
 
 /**
+ * Test if a port is owned
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device
+ * @param	owner_id
+ *   The owner identifier.
+ *   RTE_ETH_DEV_NO_OWNER means test if port is not owned.
+ * @return
+ *   - 0 if port is out of range or not owned by owner_id
+ *   - 1 if device is associated with owner_id
+ */
+__rte_experimental
+int rte_eth_dev_is_owned_by(uint16_t port_id, uint64_t owner_id);
+
+/**
  * Iterates over valid ethdev ports.
  *
  * @param port_id
