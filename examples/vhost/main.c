@@ -669,7 +669,7 @@ static unsigned check_ports_num(unsigned nb_ports)
 	}
 
 	for (portid = 0; portid < num_ports; portid ++) {
-		if (!rte_eth_dev_is_valid_port(ports[portid])) {
+		if (!rte_eth_dev_is_owned_by(portid, RTE_ETH_DEV_NO_OWNER)) {
 			RTE_LOG(INFO, VHOST_PORT,
 				"\nSpecified port ID(%u) is not valid\n",
 				ports[portid]);
