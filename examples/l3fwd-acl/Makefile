@@ -20,7 +20,9 @@ static: build/$(APP)-static
 PKGCONF ?= pkg-config
 
 PC_FILE := $(shell $(PKGCONF) --path libdpdk 2>/dev/null)
+CFLAGS += -DALLOW_EXPERIMENTAL_API
 CFLAGS += -O3 $(shell $(PKGCONF) --cflags libdpdk)
+
 LDFLAGS_SHARED = $(shell $(PKGCONF) --libs libdpdk)
 LDFLAGS_STATIC = -Wl,-Bstatic $(shell $(PKGCONF) --static --libs libdpdk)
 
@@ -51,6 +53,7 @@ include $(RTE_SDK)/mk/rte.vars.mk
 
 CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS)
+CFLAGS += -DALLOW_EXPERIMENTAL_API
 
 # workaround for a gcc bug with noreturn attribute
 # http://gcc.gnu.org/bugzilla/show_bug.cgi?id=12603
