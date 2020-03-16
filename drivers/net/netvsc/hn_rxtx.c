@@ -1362,15 +1362,14 @@ hn_xmit_pkts(void *ptxq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 		} else {
 			struct hn_txdesc *txd;
 
-			/* can send chimney data and large packet at once */
+			/* Send any outstanding packets in buffer */
 			txd = txq->agg_txd;
-			if (txd) {
-				hn_reset_txagg(txq);
-			} else {
-				txd = hn_new_txd(hv, txq);
-				if (unlikely(!txd))
-					break;
-			}
+			if (txd && hn_flush_txagg(txq, &need_sig))
+				goto fail;
+
+			txd = hn_new_txd(hv, txq);
+			if (unlikely(!txd))
+				break;
 
 			pkt = txd->rndis_pkt;
 			txd->m = m;
