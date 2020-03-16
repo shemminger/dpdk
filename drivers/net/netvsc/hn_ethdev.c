@@ -951,6 +951,7 @@ eth_hn_dev_init(struct rte_eth_dev *eth_dev)
 	hv->latency = HN_CHAN_LATENCY_NS;
 	hv->max_queues = 1;
 	rte_spinlock_init(&hv->vf_lock);
+	rte_spinlock_init(&hv->nvs_lock);
 	hv->vf_port = HN_INVALID_PORT;
 
 	err = hn_parse_args(eth_dev);

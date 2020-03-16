@@ -97,6 +97,7 @@ struct hn_data {
 	struct rte_vmbus_device *vmbus;
 	struct hn_rx_queue *primary;
 	rte_spinlock_t  vf_lock;
+	rte_spinlock_t  nvs_lock;
 	uint16_t	port_id;
 	uint16_t	vf_port;
 
