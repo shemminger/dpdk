@@ -1058,8 +1058,6 @@ eal_intr_thread_close(void *arg)
 static __attribute__((noreturn)) void *
 eal_intr_thread_main(__rte_unused void *arg)
 {
-	struct epoll_event ev;
-
 	/* host thread, never break out */
 	for (;;) {
 		/* build up the epoll fd with all descriptors we are to
@@ -1097,8 +1095,11 @@ eal_intr_thread_main(__rte_unused void *arg)
 		rte_spinlock_lock(&intr_lock);
 
 		TAILQ_FOREACH(src, &intr_sources, next) {
+			struct epoll_event ev;
+
 			if (src->callbacks.tqh_first == NULL)
 				continue; /* skip those with no callbacks */
+			memset(&ev, 0, sizeof(ev));
 			ev.events = EPOLLIN | EPOLLPRI | EPOLLRDHUP | EPOLLHUP;
 			ev.data.fd = src->intr_handle.fd;
 
