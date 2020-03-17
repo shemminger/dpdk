@@ -135,11 +135,12 @@ hn_nvs_execute(struct hn_data *hv,
 	       void *resp, uint32_t resplen,
 	       uint32_t type)
 {
+	struct hn_rx_queue *rxq = hv->primary;
 	int ret;
 
-	rte_spinlock_lock(&hv->nvs_lock);
+	rte_spinlock_lock(&rxq->ring_lock);
 	ret = __hn_nvs_execute(hv, req, reqlen, resp, resplen, type);
-	rte_spinlock_unlock(&hv->nvs_lock);
+	rte_spinlock_unlock(&rxq->ring_lock);
 
 	return ret;
 }
