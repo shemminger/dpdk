@@ -51,7 +51,6 @@ struct hn_tx_queue {
 	struct vmbus_channel *chan;
 	uint16_t	port_id;
 	uint16_t	queue_id;
-	uint32_t	free_thresh;
 	struct rte_mempool *txdesc_pool;
 	void		*tx_rndis;
 

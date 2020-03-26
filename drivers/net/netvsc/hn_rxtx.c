@@ -245,7 +245,6 @@ hn_dev_tx_queue_setup(struct rte_eth_dev *dev,
 	struct hn_data *hv = dev->data->dev_private;
 	struct hn_tx_queue *txq;
 	char name[RTE_MEMPOOL_NAMESIZE];
-	uint32_t tx_free_thresh;
 	int err = -ENOMEM;
 
 	PMD_INIT_FUNC_TRACE();
@@ -259,22 +258,6 @@ hn_dev_tx_queue_setup(struct rte_eth_dev *dev,
 	txq->chan = hv->channels[queue_idx];
 	txq->port_id = dev->data->port_id;
 	txq->queue_id = queue_idx;
-
-	tx_free_thresh = tx_conf->tx_free_thresh;
-	if (tx_free_thresh == 0)
-		tx_free_thresh = RTE_MIN(nb_desc / 4,
-					 DEFAULT_TX_FREE_THRESH);
-
-	if (tx_free_thresh + 3 >= nb_desc) {
-		PMD_INIT_LOG(ERR,
-			     "tx_free_thresh must be less than the number of TX entries minus 3(%u)."
-			     " (tx_free_thresh=%u port=%u queue=%u)\n",
-			     nb_desc - 3,
-			     tx_free_thresh, dev->data->port_id, queue_idx);
-		return -EINVAL;
-	}
-
-	txq->free_thresh = tx_free_thresh;
 
 	snprintf(name, sizeof(name),
 		 "hn_txd_%u_%u", dev->data->port_id, queue_idx);
@@ -1382,6 +1365,13 @@ hn_xmit_pkts(void *ptxq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 	if (unlikely(hv->closed))
 		return 0;
 
+	/* Pick up transmit completions and VF changes */
+	hn_process_events(hv, txq->queue_id, 0);
+
+	/* Check for changes in state of VF on primary channel */
+	if (queue_id != 0)
+		hn_process_events(hv, 0, 0);
+
 	/* Transmit over VF if present and up */
 	vf_dev = hn_get_vf_dev(hv);
 
@@ -1390,9 +1380,6 @@ hn_xmit_pkts(void *ptxq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 
 		return (*vf_dev->tx_pkt_burst)(sub_q, tx_pkts, nb_pkts);
 	}
-
-	if (rte_mempool_avail_count(txq->txdesc_pool) <= txq->free_thresh)
-		hn_process_events(hv, txq->queue_id, 0);
 
 	for (nb_tx = 0; nb_tx < nb_pkts; nb_tx++) {
 		struct rte_mbuf *m = tx_pkts[nb_tx];
@@ -1490,12 +1477,15 @@ hn_recv_pkts(void *prxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 	if (unlikely(hv->closed))
 		return 0;
 
+	/* Check for new completions */
+	hn_process_events(hv, rxq->queue_id, 0);
+
+	/* Check for changes in state of VF on primary channel */
+	if (rxq->queue_id != 0)
+		hn_process_events(hv, 0, 0);
+
 	/* Receive from VF if present and up */
 	vf_dev = hn_get_vf_dev(hv);
-
-	/* Check for new completions */
-	if (likely(rte_ring_count(rxq->rx_ring) < nb_pkts))
-		hn_process_events(hv, rxq->queue_id, 0);
 
 	/* Always check the vmbus path for multicast and new flows */
 	nb_rcv = rte_ring_sc_dequeue_burst(rxq->rx_ring,
