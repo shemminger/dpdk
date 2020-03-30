@@ -1584,7 +1584,7 @@ int bnxt_hwrm_stat_clear(struct bnxt *bp, struct bnxt_cp_ring_info *cpr)
 }
 
 int bnxt_hwrm_stat_ctx_alloc(struct bnxt *bp, struct bnxt_cp_ring_info *cpr,
-				unsigned int idx __rte_unused)
+			     unsigned int idx)
 {
 	int rc;
 	struct hwrm_stat_ctx_alloc_input req = {.req_type = 0 };
@@ -1601,6 +1601,7 @@ int bnxt_hwrm_stat_ctx_alloc(struct bnxt *bp, struct bnxt_cp_ring_info *cpr,
 	HWRM_CHECK_RESULT();
 
 	cpr->hw_stats_ctx_id = rte_le_to_cpu_32(resp->stat_ctx_id);
+	cpr->sw_stats_id = idx % RTE_ETHDEV_QUEUE_STAT_CNTRS;
 
 	HWRM_UNLOCK();
 
