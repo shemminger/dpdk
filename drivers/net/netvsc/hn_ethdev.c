@@ -134,8 +134,6 @@ eth_dev_vmbus_allocate(struct rte_vmbus_device *dev, size_t private_data_size)
 static void
 eth_dev_vmbus_release(struct rte_eth_dev *eth_dev)
 {
-	/* mac_addrs must not be freed alone because part of dev_private */
-	eth_dev->data->mac_addrs = NULL;
 	/* free ether device */
 	rte_eth_dev_release_port(eth_dev);
 
@@ -851,6 +849,9 @@ hn_dev_close(struct rte_eth_dev *dev)
 
 	hn_vf_close(dev);
 	hn_dev_free_queues(dev);
+
+	/* mac_addrs must not be freed alone because part of dev_private */
+	dev->data->mac_addrs = NULL;
 }
 
 static const struct eth_dev_ops hn_eth_dev_ops = {
