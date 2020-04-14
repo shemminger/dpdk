@@ -369,6 +369,17 @@ hn_dev_tx_queue_release(void *arg)
 	rte_free(txq);
 }
 
+int hn_dev_tx_descriptor_status(void *arg, uint16_t offset)
+{
+	const struct hn_tx_queue *txq = arg;
+	uint16_t used;
+
+	hn_process_events(txq->hv, txq->queue_id, 0);
+
+	used = rte_mempool_in_use_count(txq->txdesc_pool);
+	return (offset < used) ? RTE_ETH_TX_DESC_FULL : RTE_ETH_TX_DESC_DONE;
+}
+
 static void
 hn_nvs_send_completed(struct rte_eth_dev *dev, uint16_t queue_id,
 		      unsigned long xactid, const struct hn_nvs_rndis_ack *ack)
@@ -964,6 +975,43 @@ hn_dev_rx_queue_release(void *arg)
 	PMD_INIT_FUNC_TRACE();
 
 	hn_rx_queue_free(rxq, true);
+}
+
+/*
+ * Get the number of used descriptor in a rx queue
+ * For this device that means how many packets are pending in the ring.
+ */
+uint32_t
+hn_dev_rx_queue_count(struct rte_eth_dev *dev, uint16_t queue_id)
+{
+	struct hn_rx_queue *rxq = dev->data->rx_queues[queue_id];
+	uint32_t count;
+	int vf_count;
+
+	hn_process_events(rxq->hv, queue_id, 0);
+
+	count = rte_ring_count(rxq->rx_ring);
+	vf_count = hn_vf_rx_queue_count(rxq->hv, queue_id);
+	if (vf_count > 0)
+		count += vf_count;
+
+	return count;
+}
+
+int hn_dev_rx_queue_status(void *arg, uint16_t offset)
+{
+	const struct hn_rx_queue *rxq = arg;
+
+	if (offset >= rxq->rx_ring->capacity) {
+		rte_errno = -EINVAL;
+		return -rte_errno;
+	}
+
+	hn_process_events(rxq->hv, rxq->queue_id, 0);
+	if (offset < rte_ring_count(rxq->rx_ring))
+		return RTE_ETH_RX_DESC_DONE;
+
+	return hn_vf_rx_queue_status(rxq->hv, rxq->queue_id, offset);
 }
 
 int
