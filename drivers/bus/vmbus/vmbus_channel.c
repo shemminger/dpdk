@@ -421,26 +421,36 @@ void rte_vmbus_chan_close(struct vmbus_channel *chan)
 static void vmbus_dump_ring(FILE *f, const char *id, const struct vmbus_br *br)
 {
 	const struct vmbus_bufring *vbr = br->vbr;
-	struct vmbus_chanpkt_hdr pkt;
 
-	fprintf(f, "%s windex=%u rindex=%u mask=%u pending=%u feature=%#x\n",
-		id, vbr->windex, vbr->rindex, vbr->imask,
-		vbr->pending_send, vbr->feature_bits.value);
-	fprintf(f, " size=%u avail write=%u read=%u\n",
-		br->dsize, vmbus_br_availwrite(br, vbr->windex),
+	fprintf(f, "%s index=%u/%u  avail=%u/%u\n",
+		id, vbr->windex, vbr->rindex,
+		vmbus_br_availwrite(br, vbr->windex),
 		vmbus_br_availread(br));
-
-	if (vmbus_rxbr_peek(br, &pkt, sizeof(pkt)) == 0)
-		fprintf(f, "  pkt type %#x len %u flags %#x xactid %#"PRIx64"\n",
-			pkt.type,
-			pkt.tlen << VMBUS_CHANPKT_SIZE_SHIFT,
-			pkt.flags, pkt.xactid);
 }
 
 void rte_vmbus_chan_dump(FILE *f, const struct vmbus_channel *chan)
 {
-	fprintf(f, "channel[%u] relid=%u monitor=%u\n",
-		chan->subchannel_id, chan->relid, chan->monitor_id);
-	vmbus_dump_ring(f, "rxbr", &chan->rxbr);
-	vmbus_dump_ring(f, "txbr", &chan->txbr);
+	const struct vmbus_br *rbr = &chan->rxbr;
+	const struct vmbus_bufring *vbr = rbr->vbr;
+	struct vmbus_chanpkt_hdr pkt;
+
+	fprintf(f, "chan %u: relid=%u mask=%u",
+		chan->subchannel_id, chan->relid, vbr->imask);
+
+	if (vbr->feature_bits.feat_pending_send_sz)
+		fprintf(f, " pending_sz=%u\n",
+			vbr->pending_send);
+	else
+		fprintf(f, "\n");
+
+	vmbus_dump_ring(f, "    tx", &chan->txbr);
+	vmbus_dump_ring(f, "    rx", rbr);
+
+	/* show first packet if any from host */
+	if (vmbus_rxbr_peek(rbr, &pkt, sizeof(pkt)))
+		return;
+
+	fprintf(f, "[pkt type %#x len %u flags %#x xactid %#"PRIx64"]\n",
+		pkt.type, pkt.tlen << VMBUS_CHANPKT_SIZE_SHIFT,
+		pkt.flags, pkt.xactid);
 }
