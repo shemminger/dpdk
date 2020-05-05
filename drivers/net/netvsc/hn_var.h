@@ -243,8 +243,6 @@ int	hn_vf_rx_queue_setup(struct rte_eth_dev *dev,
 			     const struct rte_eth_rxconf *rx_conf,
 			     struct rte_mempool *mp);
 void	hn_vf_rx_queue_release(struct hn_data *hv, uint16_t queue_id);
-int     hn_vf_rx_queue_count(struct hn_data *hv, uint16_t queue_id);
-int     hn_vf_rx_queue_status(struct hn_data *hv, uint16_t queue_id, uint16_t offset);
 
 int	hn_vf_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats);
 int	hn_vf_stats_reset(struct rte_eth_dev *dev);

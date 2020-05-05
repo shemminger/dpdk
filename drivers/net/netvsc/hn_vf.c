@@ -628,30 +628,3 @@ int hn_vf_reta_hash_update(struct rte_eth_dev *dev,
 
 	return ret;
 }
-
-int hn_vf_rx_queue_count(struct hn_data *hv, uint16_t queue_id)
-{
-	uint16_t vf_port = hv->vf_port;
-
-	if (vf_port == HN_INVALID_PORT)
-		return 0;
-	else
-		return rte_eth_rx_queue_count(vf_port, queue_id);
-}
-
-/*
- * Check if VF has packet available.
- * Only called if no packet available in rx ring for slow path.
- */
-int hn_vf_rx_queue_status(struct hn_data *hv, uint16_t queue_id, uint16_t offset)
-{
-	uint16_t vf_port = hv->vf_port;
-	int ret;
-
-	if (vf_port == HN_INVALID_PORT)
-		return RTE_ETH_RX_DESC_AVAIL;
-
-	ret = rte_eth_rx_descriptor_status(vf_port, queue_id, offset);
-
-	return (ret == RTE_ETH_RX_DESC_DONE) ? RTE_ETH_RX_DESC_DONE : RTE_ETH_RX_DESC_AVAIL;
-}
