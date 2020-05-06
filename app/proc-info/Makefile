@@ -5,7 +5,10 @@ include $(RTE_SDK)/mk/rte.vars.mk
 
 APP = dpdk-procinfo
 
+CFLAGS += -DALLOW_EXPERIMENTAL_API
+CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS)
+CFLAGS += -Wno-deprecated-declarations
 
 # all source are stored in SRCS-y
 

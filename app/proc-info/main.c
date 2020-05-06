@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <unistd.h>
+#include <strings.h>
 
 #include <rte_eal.h>
 #include <rte_common.h>
@@ -676,19 +677,26 @@ eth_tx_queue_available(uint16_t port_id, uint16_t queue_id, uint16_t n)
 static void
 show_port(void)
 {
-	uint16_t i = 0;
-	int ret = 0, j, k;
+	uint32_t port_mask = enabled_port_mask;
+	int i, ret, j, k;
 
 	snprintf(bdr_str, MAX_STRING_LEN, " show - Port PMD ");
 	STATS_BDR_STR(10, bdr_str);
 
-	RTE_ETH_FOREACH_DEV(i) {
+	for (port_mask = enabled_port_mask; port_mask != 0;
+	     port_mask &= ~(1u << i)) {
 		uint16_t mtu = 0;
 		struct rte_eth_link link;
 		struct rte_eth_dev_info dev_info;
 		struct rte_eth_rss_conf rss_conf;
 		struct rte_eth_fc_conf fc_conf;
 		struct rte_ether_addr mac;
+		struct rte_eth_dev_owner owner;
+
+		i = ffs(port_mask) - 1;
+
+		if (!rte_eth_dev_is_valid_port(i))
+			continue;
 
 		memset(&rss_conf, 0, sizeof(rss_conf));
 
@@ -706,6 +714,11 @@ show_port(void)
 		printf("\t  -- driver %s device %s socket %d\n",
 		       dev_info.driver_name, dev_info.device->name,
 		       rte_eth_dev_socket_id(i));
+
+		ret = rte_eth_dev_owner_get(i, &owner);
+		if (ret == 0 && owner.id != RTE_ETH_DEV_NO_OWNER)
+			printf("\t --  owner %#"PRIx64":%s\n",
+			       owner.id, owner.name);
 
 		ret = rte_eth_link_get(i, &link);
 		if (ret < 0) {
@@ -1342,6 +1355,7 @@ main(int argc, char **argv)
 	char log_flag[] = "--log-level=6";
 	char *argp[argc + 4];
 	uint16_t nb_ports;
+	uint32_t port_mask;
 
 	/* preparse app arguments */
 	ret = proc_info_preparse_args(argc, argv);
@@ -1385,28 +1399,40 @@ main(int argc, char **argv)
 	if (nb_ports == 0)
 		rte_exit(EXIT_FAILURE, "No Ethernet ports - bye\n");
 
-	/* If no port mask was specified*/
-	if (enabled_port_mask == 0)
-		enabled_port_mask = 0xffff;
-
-	RTE_ETH_FOREACH_DEV(i) {
-		if (enabled_port_mask & (1 << i)) {
-			if (enable_stats)
-				nic_stats_display(i);
-			else if (enable_xstats)
-				nic_xstats_display(i);
-			else if (reset_stats)
-				nic_stats_clear(i);
-			else if (reset_xstats)
-				nic_xstats_clear(i);
-			else if (enable_xstats_name)
-				nic_xstats_by_name_display(i, xstats_name);
-			else if (nb_xstats_ids > 0)
-				nic_xstats_by_ids_display(i, xstats_ids,
-						nb_xstats_ids);
-			else if (enable_metrics)
-				metrics_display(i);
+	/* If no port mask was specified, one will be provided */
+	if (enabled_port_mask == 0) {
+		RTE_ETH_FOREACH_DEV(i) {
+			enabled_port_mask |= 1u << i;
 		}
+	}
+
+	for (port_mask = enabled_port_mask; port_mask != 0;
+	     port_mask &= ~(1u << i)) {
+		/* ffs() first bit is 1 not 0 */
+		i = ffs(port_mask) - 1;
+
+		if (i >= RTE_MAX_ETHPORTS)
+			break;
+
+		if (!rte_eth_dev_is_valid_port(i))
+			continue;
+
+		if (enable_stats)
+			nic_stats_display(i);
+		else if (enable_xstats)
+			nic_xstats_display(i);
+		else if (reset_stats)
+			nic_stats_clear(i);
+		else if (reset_xstats)
+			nic_xstats_clear(i);
+		else if (enable_xstats_name)
+			nic_xstats_by_name_display(i, xstats_name);
+		else if (nb_xstats_ids > 0)
+			nic_xstats_by_ids_display(i, xstats_ids,
+						  nb_xstats_ids);
+		else if (enable_metrics)
+			metrics_display(i);
+
 	}
 
 	/* print port independent stats */
