@@ -779,12 +779,11 @@ show_port(void)
 			}
 		}
 
-		printf("  - cyrpto context\n");
 #ifdef RTE_LIBRTE_SECURITY
 		void *p_ctx = rte_eth_dev_get_sec_ctx(i);
-		printf("\t  -- security context - %p\n", p_ctx);
-
 		if (p_ctx) {
+			printf("  - crypto context\n");
+			printf("\t  -- security context - %p\n", p_ctx);
 			printf("\t  -- size %u\n",
 					rte_security_session_get_size(p_ctx));
 			const struct rte_security_capability *s_cap =
