@@ -31,8 +31,6 @@ struct bnxt_cp_ring_info;
 	(1 << (HWRM_ASYNC_EVENT_CMPL_EVENT_ID_PF_DRVR_UNLOAD - 32))
 #define ASYNC_CMPL_EVENT_ID_VF_CFG_CHANGE	\
 	(1 << (HWRM_ASYNC_EVENT_CMPL_EVENT_ID_VF_CFG_CHANGE - 32))
-#define ASYNC_CMPL_EVENT_ID_DBG_NOTIFICATION	\
-	(1 << (HWRM_ASYNC_EVENT_CMPL_EVENT_ID_DEBUG_NOTIFICATION - 32))
 
 #define HWRM_QUEUE_SERVICE_PROFILE_LOSSY \
 	HWRM_QUEUE_QPORTCFG_OUTPUT_QUEUE_ID0_SERVICE_PROFILE_LOSSY
@@ -142,10 +140,14 @@ int bnxt_hwrm_vnic_tpa_cfg(struct bnxt *bp,
 
 int bnxt_alloc_all_hwrm_stat_ctxs(struct bnxt *bp);
 int bnxt_clear_all_hwrm_stat_ctxs(struct bnxt *bp);
+int bnxt_free_all_hwrm_stat_ctxs(struct bnxt *bp);
+int bnxt_free_all_hwrm_rings(struct bnxt *bp);
+int bnxt_free_all_hwrm_ring_grps(struct bnxt *bp);
 int bnxt_alloc_all_hwrm_ring_grps(struct bnxt *bp);
 void bnxt_free_cp_ring(struct bnxt *bp, struct bnxt_cp_ring_info *cpr);
 void bnxt_free_nq_ring(struct bnxt *bp, struct bnxt_cp_ring_info *cpr);
 int bnxt_set_hwrm_vnic_filters(struct bnxt *bp, struct bnxt_vnic_info *vnic);
+int bnxt_clear_hwrm_vnic_filters(struct bnxt *bp, struct bnxt_vnic_info *vnic);
 void bnxt_free_all_hwrm_resources(struct bnxt *bp);
 void bnxt_free_hwrm_resources(struct bnxt *bp);
 void bnxt_free_hwrm_rx_ring(struct bnxt *bp, int queue_index);
@@ -170,6 +172,7 @@ int bnxt_hwrm_tunnel_dst_port_alloc(struct bnxt *bp, uint16_t port,
 				uint8_t tunnel_type);
 int bnxt_hwrm_tunnel_dst_port_free(struct bnxt *bp, uint16_t port,
 				uint8_t tunnel_type);
+void bnxt_free_tunnel_ports(struct bnxt *bp);
 int bnxt_hwrm_set_default_vlan(struct bnxt *bp, int vf, uint8_t is_vf);
 int bnxt_hwrm_port_qstats(struct bnxt *bp);
 int bnxt_hwrm_port_clr_stats(struct bnxt *bp);

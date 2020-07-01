@@ -77,7 +77,7 @@ bnxt_flow_non_void_action(const struct rte_flow_action *cur)
 
 static int
 bnxt_filter_type_check(const struct rte_flow_item pattern[],
-		       struct rte_flow_error *error)
+		       struct rte_flow_error *error __rte_unused)
 {
 	const struct rte_flow_item *item =
 		bnxt_flow_non_void_item(pattern);
@@ -993,7 +993,6 @@ bnxt_update_filter_flags_en(struct bnxt_filter_info *filter,
 	}
 	filter->fw_l2_filter_id = filter1->fw_l2_filter_id;
 	filter->l2_ref_cnt = filter1->l2_ref_cnt;
-	filter->flow_id = filter1->flow_id;
 	PMD_DRV_LOG(DEBUG,
 		"l2_filter: %p fw_l2_filter_id %" PRIx64 " l2_ref_cnt %u\n",
 		filter1, filter->fw_l2_filter_id, filter->l2_ref_cnt);
@@ -1036,8 +1035,6 @@ bnxt_validate_and_parse_flow(struct rte_eth_dev *dev,
 		filter->flags = HWRM_CFA_EM_FLOW_ALLOC_INPUT_FLAGS_PATH_RX;
 
 	use_ntuple = bnxt_filter_type_check(pattern, error);
-
-start:
 	switch (act->type) {
 	case RTE_FLOW_ACTION_TYPE_QUEUE:
 		/* Allow this flow. Redirect to a VNIC. */
@@ -1186,7 +1183,6 @@ use_vnic:
 		}
 
 		filter->fw_l2_filter_id = filter1->fw_l2_filter_id;
-		filter->flow_id = filter1->flow_id;
 		filter->flags = HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_FLAGS_METER;
 		break;
 	case RTE_FLOW_ACTION_TYPE_VF:
@@ -1255,7 +1251,6 @@ use_vnic:
 		}
 
 		filter->fw_l2_filter_id = filter1->fw_l2_filter_id;
-		filter->flow_id = filter1->flow_id;
 		break;
 	case RTE_FLOW_ACTION_TYPE_RSS:
 		rss = (const struct rte_flow_action_rss *)act->conf;
@@ -1263,6 +1258,7 @@ use_vnic:
 		vnic_id = attr->group;
 
 		BNXT_VALID_VNIC_OR_RET(bp, vnic_id);
+
 		vnic = &bp->vnic_info[vnic_id];
 
 		/* Check if requested RSS config matches RSS config of VNIC
@@ -1400,34 +1396,6 @@ vnic_found:
 		PMD_DRV_LOG(DEBUG, "L2 filter created\n");
 		bnxt_update_filter_flags_en(filter, filter1, use_ntuple);
 		break;
-	case RTE_FLOW_ACTION_TYPE_MARK:
-		if (bp->flags & BNXT_FLAG_RX_VECTOR_PKT_MODE) {
-			PMD_DRV_LOG(DEBUG,
-				    "Disable vector processing for mark\n");
-			rte_flow_error_set(error,
-					   ENOTSUP,
-					   RTE_FLOW_ERROR_TYPE_ACTION,
-					   act,
-					   "Disable vector processing for mark");
-			rc = -rte_errno;
-			goto ret;
-		}
-
-		if (bp->mark_table == NULL) {
-			rte_flow_error_set(error,
-					   ENOMEM,
-					   RTE_FLOW_ERROR_TYPE_ACTION,
-					   act,
-					   "Mark table not allocated.");
-			rc = -rte_errno;
-			goto ret;
-		}
-
-		filter->valid_flags |= BNXT_FLOW_MARK_FLAG;
-		filter->mark = ((const struct rte_flow_action_mark *)
-				act->conf)->id;
-		PMD_DRV_LOG(DEBUG, "Mark the flow %d\n", filter->mark);
-		break;
 	default:
 		rte_flow_error_set(error,
 				   EINVAL,
@@ -1440,17 +1408,20 @@ vnic_found:
 
 done:
 	act = bnxt_flow_non_void_action(++act);
-	while (act->type != RTE_FLOW_ACTION_TYPE_END)
-		goto start;
+	if (act->type != RTE_FLOW_ACTION_TYPE_END) {
+		rte_flow_error_set(error,
+				   EINVAL,
+				   RTE_FLOW_ERROR_TYPE_ACTION,
+				   act,
+				   "Invalid action.");
+		rc = -rte_errno;
+		goto ret;
+	}
 
 	return rc;
 ret:
 
-	if (filter1) {
-		bnxt_hwrm_clear_l2_filter(bp, filter1);
-		bnxt_free_filter(bp, filter1);
-	}
-
+	//TODO: Cleanup according to ACTION TYPE.
 	if (rte_errno)  {
 		if (vnic && STAILQ_EMPTY(&vnic->filter))
 			vnic->rx_queue_cnt = 0;
@@ -1531,6 +1502,7 @@ bnxt_flow_validate(struct rte_eth_dev *dev,
 
 exit:
 	/* No need to hold on to this filter if we are just validating flow */
+	filter->fw_l2_filter_id = UINT64_MAX;
 	bnxt_free_filter(bp, filter);
 	bnxt_release_flow_lock(bp);
 
@@ -1640,7 +1612,7 @@ bnxt_flow_create(struct rte_eth_dev *dev,
 	bool update_flow = false;
 	struct rte_flow *flow;
 	int ret = 0;
-	uint32_t tun_type, flow_id;
+	uint32_t tun_type;
 
 	if (BNXT_VF(bp) && !BNXT_VF_IS_TRUSTED(bp)) {
 		rte_flow_error_set(error, EINVAL,
@@ -1764,25 +1736,6 @@ done:
 		STAILQ_INSERT_TAIL(&vnic->filter, filter, next);
 		PMD_DRV_LOG(DEBUG, "Successfully created flow.\n");
 		STAILQ_INSERT_TAIL(&vnic->flow_list, flow, next);
-		if (filter->valid_flags & BNXT_FLOW_MARK_FLAG) {
-			PMD_DRV_LOG(DEBUG,
-				    "Mark action: mark id 0x%x, flow id 0x%x\n",
-				    filter->mark, filter->flow_id);
-
-			/* TCAM and EM should be 16-bit only.
-			 * Other modes not supported.
-			 */
-			flow_id = filter->flow_id & BNXT_FLOW_ID_MASK;
-			if (bp->mark_table[flow_id].valid) {
-				PMD_DRV_LOG(ERR,
-					    "Entry for Mark id 0x%x occupied"
-					    " flow id 0x%x\n",
-					    filter->mark, filter->flow_id);
-				goto free_filter;
-			}
-			bp->mark_table[flow_id].valid = true;
-			bp->mark_table[flow_id].mark_id = filter->mark;
-		}
 		bnxt_release_flow_lock(bp);
 		return flow;
 	}
@@ -1857,7 +1810,6 @@ _bnxt_flow_destroy(struct bnxt *bp,
 	struct bnxt_filter_info *filter;
 	struct bnxt_vnic_info *vnic;
 	int ret = 0;
-	uint32_t flow_id;
 
 	filter = flow->filter;
 	vnic = flow->vnic;
@@ -1874,13 +1826,6 @@ _bnxt_flow_destroy(struct bnxt *bp,
 	ret = bnxt_match_filter(bp, filter);
 	if (ret == 0)
 		PMD_DRV_LOG(ERR, "Could not find matching flow\n");
-
-	if (filter->valid_flags & BNXT_FLOW_MARK_FLAG) {
-		flow_id = filter->flow_id & BNXT_FLOW_ID_MASK;
-		memset(&bp->mark_table[flow_id], 0,
-		       sizeof(bp->mark_table[flow_id]));
-		filter->flow_id = 0;
-	}
 
 	if (filter->filter_type == HWRM_CFA_EM_FILTER)
 		ret = bnxt_hwrm_clear_em_filter(bp, filter);

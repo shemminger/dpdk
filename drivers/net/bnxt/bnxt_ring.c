@@ -598,7 +598,7 @@ int bnxt_alloc_hwrm_rx_ring(struct bnxt *bp, int queue_index)
 
 	if (rxq->rx_started) {
 		if (bnxt_init_one_rx_ring(rxq)) {
-			RTE_LOG(ERR, PMD,
+			PMD_DRV_LOG(ERR,
 				"bnxt_init_one_rx_ring failed!\n");
 			bnxt_rx_queue_release_op(rxq);
 			rc = -ENOMEM;
@@ -608,7 +608,7 @@ int bnxt_alloc_hwrm_rx_ring(struct bnxt *bp, int queue_index)
 		bnxt_db_write(&rxr->ag_db, rxr->ag_prod);
 	}
 	rxq->index = queue_index;
-#ifdef RTE_BNXT_INC_VECTOR
+#ifdef RTE_ARCH_X86
 	bnxt_rxq_vec_setup(rxq);
 #endif
 
@@ -713,7 +713,7 @@ int bnxt_alloc_hwrm_rings(struct bnxt *bp)
 		bnxt_db_write(&rxr->rx_db, rxr->rx_prod);
 		bnxt_db_write(&rxr->ag_db, rxr->ag_prod);
 		rxq->index = i;
-#ifdef RTE_BNXT_INC_VECTOR
+#ifdef RTE_ARCH_X86
 		bnxt_rxq_vec_setup(rxq);
 #endif
 	}

@@ -470,10 +470,10 @@ struct bnxt_error_recovery_info {
 	uint32_t        last_reset_counter;
 };
 
-struct bnxt_mark_info {
-	uint32_t	mark_id;
-	bool		valid;
-};
+/* Frequency for the FUNC_DRV_IF_CHANGE retry in milliseconds */
+#define BNXT_IF_CHANGE_RETRY_INTERVAL	50
+/* Maximum retry count for FUNC_DRV_IF_CHANGE */
+#define BNXT_IF_CHANGE_RETRY_COUNT	40
 
 /* address space location of register */
 #define BNXT_FW_STATUS_REG_TYPE_MASK	3
@@ -499,7 +499,6 @@ struct bnxt {
 	void				*bar0;
 
 	struct rte_eth_dev		*eth_dev;
-	struct rte_eth_rss_conf		rss_conf;
 	struct rte_pci_device		*pdev;
 	void				*doorbell_base;
 
@@ -525,10 +524,10 @@ struct bnxt {
 #define BNXT_FLAG_FW_HEALTH_CHECK_SCHEDULED	BIT(18)
 #define BNXT_FLAG_EXT_STATS_SUPPORTED		BIT(19)
 #define BNXT_FLAG_NEW_RM			BIT(20)
-#define BNXT_FLAG_NPAR_PF			BIT(21)
 #define BNXT_FLAG_FW_CAP_ONE_STEP_TX_TS		BIT(22)
 #define BNXT_FLAG_ADV_FLOW_MGMT			BIT(23)
-#define BNXT_FLAG_RX_VECTOR_PKT_MODE		BIT(24)
+#define BNXT_FLAG_NPAR_PF                      BIT(24)
+#define BNXT_FLAG_DFLT_MAC_SET			BIT(26)
 #define BNXT_PF(bp)		(!((bp)->flags & BNXT_FLAG_VF))
 #define BNXT_VF(bp)		((bp)->flags & BNXT_FLAG_VF)
 #define BNXT_NPAR(bp)		((bp)->flags & BNXT_FLAG_NPAR_PF)
@@ -541,6 +540,7 @@ struct bnxt {
 #define BNXT_STINGRAY(bp)	((bp)->flags & BNXT_FLAG_STINGRAY)
 #define BNXT_HAS_NQ(bp)		BNXT_CHIP_THOR(bp)
 #define BNXT_HAS_RING_GRPS(bp)	(!BNXT_CHIP_THOR(bp))
+#define BNXT_HAS_DFLT_MAC_SET(bp)      ((bp)->flags & BNXT_FLAG_DFLT_MAC_SET)
 
 	uint32_t		fw_cap;
 #define BNXT_FW_CAP_HOT_RESET		BIT(0)
@@ -623,7 +623,6 @@ struct bnxt {
 	uint8_t                 max_q;
 
 	uint16_t		fw_fid;
-	uint8_t			dflt_mac_addr[RTE_ETHER_ADDR_LEN];
 	uint16_t		max_rsscos_ctx;
 	uint16_t		max_cp_rings;
 	uint16_t		max_tx_rings;
@@ -631,10 +630,10 @@ struct bnxt {
 #define MAX_STINGRAY_RINGS		128U
 /* For sake of symmetry, max Tx rings == max Rx rings, one stat ctx for each */
 #define BNXT_MAX_RX_RINGS(bp) \
-	(BNXT_STINGRAY(bp) ? RTE_MIN(RTE_MIN(bp->max_rx_rings, \
+	(BNXT_STINGRAY(bp) ? RTE_MIN(RTE_MIN(bp->max_rx_rings / 2U, \
 					     MAX_STINGRAY_RINGS), \
 				     bp->max_stat_ctx / 2U) : \
-				RTE_MIN(bp->max_rx_rings, \
+				RTE_MIN(bp->max_rx_rings / 2U, \
 					bp->max_stat_ctx / 2U))
 #define BNXT_MAX_TX_RINGS(bp) \
 	(RTE_MIN((bp)->max_tx_rings, BNXT_MAX_RX_RINGS(bp)))
@@ -675,10 +674,6 @@ struct bnxt {
 
 	/* Struct to hold adapter error recovery related info */
 	struct bnxt_error_recovery_info *recovery_info;
-#define BNXT_MARK_TABLE_SZ	(sizeof(struct bnxt_mark_info)  * 64 * 1024)
-/* TCAM and EM should be 16-bit only. Other modes not supported. */
-#define BNXT_FLOW_ID_MASK	0x0000ffff
-	struct bnxt_mark_info	*mark_table;
 };
 
 int bnxt_mtu_set_op(struct rte_eth_dev *eth_dev, uint16_t new_mtu);
@@ -686,6 +681,7 @@ int bnxt_link_update(struct rte_eth_dev *eth_dev, int wait_to_complete,
 		     bool exp_link_status);
 int bnxt_rcv_msg_from_vf(struct bnxt *bp, uint16_t vf_id, void *msg);
 int is_bnxt_in_error(struct bnxt *bp);
+uint16_t bnxt_rss_ctxts(const struct bnxt *bp);
 
 int bnxt_map_fw_health_status_regs(struct bnxt *bp);
 uint32_t bnxt_read_fw_status_reg(struct bnxt *bp, uint32_t index);
