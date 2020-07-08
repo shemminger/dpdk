@@ -13,7 +13,7 @@
 #include <rte_memzone.h>
 #include <rte_spinlock.h>
 
-#define RTE_METRICS_MAX_METRICS 256
+#define RTE_METRICS_MAX_METRICS 1024
 #define RTE_METRICS_MEMZONE_NAME "RTE_METRICS"
 
 /**
