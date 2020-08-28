@@ -627,7 +627,7 @@ struct bnxt {
 	uint16_t		max_cp_rings;
 	uint16_t		max_tx_rings;
 	uint16_t		max_rx_rings;
-#define MAX_STINGRAY_RINGS		128U
+#define MAX_STINGRAY_RINGS		256U
 /* For sake of symmetry, max Tx rings == max Rx rings, one stat ctx for each */
 #define BNXT_MAX_RX_RINGS(bp) \
 	(BNXT_STINGRAY(bp) ? RTE_MIN(RTE_MIN(bp->max_rx_rings / 2U, \
