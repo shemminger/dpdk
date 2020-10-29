@@ -135,16 +135,6 @@ static void bnxt_cancel_fw_health_check(struct bnxt *bp);
 static int bnxt_restore_vlan_filters(struct bnxt *bp);
 static void bnxt_dev_recover(void *arg);
 
-int is_bnxt_in_error(struct bnxt *bp)
-{
-	if (bp->flags & BNXT_FLAG_FATAL_ERROR)
-		return -EIO;
-	if (bp->flags & BNXT_FLAG_FW_RESET)
-		return -EBUSY;
-
-	return 0;
-}
-
 /***********************/
 
 /*
