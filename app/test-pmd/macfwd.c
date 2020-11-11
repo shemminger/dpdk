@@ -56,6 +56,10 @@ pkt_burst_mac_forward(struct fwd_stream *fs)
 	uint16_t i;
 	uint64_t ol_flags = 0;
 	uint64_t tx_offloads;
+	static const struct rte_ether_addr pf0mac = {
+		.addr_bytes = { 0x28, 0x16, 0xa8, 0xfd, 0x52, 0x60 },
+	};
+
 #ifdef RTE_TEST_PMD_RECORD_CORE_CYCLES
 	uint64_t start_tsc;
 	uint64_t end_tsc;
@@ -92,16 +96,36 @@ pkt_burst_mac_forward(struct fwd_stream *fs)
 						       void *));
 		mb = pkts_burst[i];
 		eth_hdr = rte_pktmbuf_mtod(mb, struct rte_ether_hdr *);
+#ifdef ORIGINAL_CODE
 		rte_ether_addr_copy(&peer_eth_addrs[fs->peer_addr],
 				&eth_hdr->d_addr);
 		rte_ether_addr_copy(&ports[fs->tx_port].eth_addr,
 				&eth_hdr->s_addr);
+		mb->vlan_tci = txp->tx_vlan_id;
+		mb->vlan_tci_outer = txp->tx_vlan_id_outer;
+#else
+		if (!rte_is_same_ether_addr(&eth_hdr->s_addr, &pf0mac)) {
+			/* Make sure any received VLAN is stripped into tci */
+			if (!(mb->ol_flags & PKT_RX_VLAN_STRIPPED)) {
+				rte_vlan_strip(mb);
+				eth_hdr = rte_pktmbuf_mtod(mb, struct rte_ether_hdr *);
+			}
+
+			rte_ether_addr_copy(&pf0mac, &eth_hdr->d_addr);
+			mb->vlan_tci = 3;
+
+			/* If not doing VLAN offload, do it in SW */
+			if (!(ol_flags & PKT_TX_VLAN_PKT)) {
+				rte_vlan_insert(&mb);
+				pkts_burst[i] = mb;
+			}
+		}
+#endif
+
 		mb->ol_flags &= IND_ATTACHED_MBUF | EXT_ATTACHED_MBUF;
 		mb->ol_flags |= ol_flags;
 		mb->l2_len = sizeof(struct rte_ether_hdr);
 		mb->l3_len = sizeof(struct rte_ipv4_hdr);
-		mb->vlan_tci = txp->tx_vlan_id;
-		mb->vlan_tci_outer = txp->tx_vlan_id_outer;
 	}
 	nb_tx = rte_eth_tx_burst(fs->tx_port, fs->tx_queue, pkts_burst, nb_rx);
 	/*
